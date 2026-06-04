@@ -45,6 +45,7 @@ export class SubscriptionsComponent {
       cta: 'free',
       features: [
         { key: 'feat.basic_news', included: true, highlighted: true },
+        { key: 'feat.daily_newsletter', included: true },
         { key: 'feat.basic_search', included: true },
         { key: 'feat.limited_articles', included: true },
         { key: 'feat.all_articles', included: false },
@@ -68,6 +69,7 @@ export class SubscriptionsComponent {
       popular: true,
       features: [
         { key: 'feat.basic_news', included: true },
+        { key: 'feat.daily_newsletter', included: true },
         { key: 'feat.basic_search', included: true },
         { key: 'feat.all_articles', included: true, highlighted: true },
         { key: 'feat.sector_reports', included: true, highlighted: true },
@@ -91,6 +93,7 @@ export class SubscriptionsComponent {
       recommended: true,
       features: [
         { key: 'feat.basic_news', included: true },
+        { key: 'feat.daily_newsletter', included: true },
         { key: 'feat.basic_search', included: true },
         { key: 'feat.all_articles', included: true },
         { key: 'feat.sector_reports', included: true },

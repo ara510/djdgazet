@@ -102,6 +102,10 @@ const DICTIONARY: TranslationDict = {
     fr: 'Accès aux actualités générales',
     en: 'Access to general news',
   },
+  'feat.daily_newsletter': {
+    fr: 'Newsletter quotidienne',
+    en: 'Daily newsletter',
+  },
   'feat.basic_search': {
     fr: 'Recherche dans les archives (30 jours)',
     en: 'Archive search (30 days)',
@@ -198,6 +202,7 @@ const DICTIONARY: TranslationDict = {
   'footer.press': { fr: 'Presse', en: 'Press' },
   'footer.sections': { fr: 'Sections', en: 'Sections' },
   'footer.services': { fr: 'Services', en: 'Services' },
+  'footer.newsletter': { fr: 'Newsletter', en: 'Newsletter' },
   'footer.subscriptions': { fr: 'Abonnements', en: 'Subscriptions' },
   'footer.archives': { fr: 'Archives', en: 'Archives' },
   'footer.legal': { fr: 'Mentions légales', en: 'Legal' },
@@ -213,6 +218,15 @@ const DICTIONARY: TranslationDict = {
     fr: 'Le premier journal en ligne 100% dédié à l\'actualité de Madagascar.',
     en: 'The first online newspaper 100% dedicated to Madagascar news.',
   },
+  'footer.newsletter_text': {
+    fr: 'Recevez chaque matin l\'essentiel de l\'actualité malgache.',
+    en: 'Get the essential Madagascar news every morning.',
+  },
+  'footer.newsletter_placeholder': {
+    fr: 'Votre adresse email',
+    en: 'Your email address',
+  },
+  'footer.newsletter_submit': { fr: 'S\'abonner', en: 'Subscribe' },
 };
 
 @Injectable({ providedIn: 'root' })
