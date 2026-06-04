@@ -1,30 +1,4 @@
 <footer class="bg-gazety-dark text-silver-200 mt-16">
-  <!-- Newsletter band -->
-  <div class="bg-gazety-gray border-b border-gazety-dark">
-    <div class="container-news py-10">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        <div>
-          <h3 class="font-display font-bold text-2xl md:text-3xl text-white mb-2">
-            {{ i18n.t('footer.newsletter') }}
-          </h3>
-          <p class="text-silver-300 text-sm md:text-base">
-            {{ i18n.t('footer.newsletter_text') }}
-          </p>
-        </div>
-        <form class="flex flex-col sm:flex-row gap-3" (submit)="$event.preventDefault()">
-          <input
-            type="email"
-            [placeholder]="i18n.t('footer.newsletter_placeholder')"
-            class="flex-1 px-4 py-3 bg-white text-gazety-dark rounded-sm focus:outline-none focus:ring-2 focus:ring-gazety-accent"
-          />
-          <button type="submit" class="bg-gazety-red hover:bg-gold-600 text-gazety-dark font-semibold px-6 py-3 rounded-sm transition-colors whitespace-nowrap">
-            {{ i18n.t('footer.newsletter_submit') }}
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <!-- Main footer grid -->
   <div class="container-news py-12">
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
@@ -103,7 +77,6 @@
         </h4>
         <ul class="space-y-2 text-sm">
           <li><a routerLink="/abonnements" class="text-silver-400 hover:text-white transition-colors">{{ i18n.t('footer.subscriptions') }}</a></li>
-          <li><a href="#" class="text-silver-400 hover:text-white transition-colors">{{ i18n.t('footer.newsletter') }}</a></li>
           <li><a href="#" class="text-silver-400 hover:text-white transition-colors">{{ i18n.t('footer.archives') }}</a></li>
           <li><a href="#" class="text-silver-400 hover:text-white transition-colors">RSS</a></li>
         </ul>
