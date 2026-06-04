@@ -7,14 +7,14 @@ import { I18nService } from '../../services/i18n.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="bg-gazety-red text-white overflow-hidden">
+    <div class="bg-gazety-dark text-white overflow-hidden border-y border-gazety-red/40">
       <div class="container-news flex items-center gap-3 py-2">
         <div class="flex items-center gap-2 shrink-0 font-bold text-xs tracking-wider">
           <span class="relative flex h-2 w-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gazety-red opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-gazety-red"></span>
           </span>
-          {{ i18n.t('ticker.breaking') }}
+          <span class="text-gazety-accent">{{ i18n.t('ticker.breaking') }}</span>
         </div>
         <div class="flex-1 overflow-hidden">
           <div class="flex gap-12 animate-marquee whitespace-nowrap text-sm">

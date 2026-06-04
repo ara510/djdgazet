@@ -14,7 +14,7 @@
           <!-- Top badges -->
           <div class="absolute top-4 left-4 flex items-center gap-2">
             @if (heroBadge) {
-              <span class="premium-badge bg-gazety-red text-white text-[11px]">
+              <span class="premium-badge bg-gazety-red text-gazety-dark text-[11px]">
                 @if (hero.badge === 'live') {
                   <span class="relative flex h-1.5 w-1.5">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white"></span>
@@ -25,7 +25,7 @@
               </span>
             }
             @if (hero.premium) {
-              <span class="premium-badge bg-gold-500 text-white text-[11px]">
+              <span class="premium-badge bg-gold-500 text-gazety-dark text-[11px]">
                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z"/></svg>
                 PREMIUM
               </span>

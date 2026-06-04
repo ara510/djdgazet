@@ -37,7 +37,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-gazety-red text-white font-semibold px-5 py-2.5 rounded-sm hover:bg-red-700 transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-2 bg-gazety-red text-gazety-dark font-semibold px-5 py-2.5 rounded-sm hover:bg-gold-600 transition-colors duration-200;
   }
 
   .btn-outline {
