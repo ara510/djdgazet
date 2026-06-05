@@ -1,33 +1,4 @@
 <header class="bg-white border-b border-silver-200 sticky top-0 z-40">
-  <!-- Top utility bar -->
-  <div class="bg-gazety-dark text-silver-100">
-    <div class="container-news flex items-center justify-between py-1.5 text-xs">
-      <div class="hidden md:flex items-center gap-4">
-        <span class="capitalize">
-          {{ i18n.isFrench() ? today : todayEn }}
-        </span>
-        <span class="text-silver-400">|</span>
-        <span class="hidden lg:inline">{{ i18n.t('header.tagline') }}</span>
-      </div>
-      <div class="flex items-center gap-3 ml-auto">
-        <a routerLink="/abonnements" class="hover:text-gazety-accent transition-colors">
-          {{ i18n.t('header.subscriptions') }}
-        </a>
-        <span class="text-silver-600">|</span>
-        @if (auth.isLoggedIn()) {
-          <span class="text-gazety-accent font-medium">{{ auth.user()?.name }}</span>
-          <button (click)="logout()" class="hover:text-gazety-accent transition-colors">
-            {{ i18n.isFrench() ? 'Déconnexion' : 'Sign out' }}
-          </button>
-        } @else {
-          <button (click)="openAuth.emit('login')" class="hover:text-gazety-accent transition-colors">
-            {{ i18n.t('header.login') }}
-          </button>
-        }
-      </div>
-    </div>
-  </div>
-
   <!-- Main header -->
   <div class="container-news py-4">
     <div class="flex items-center justify-between gap-4">

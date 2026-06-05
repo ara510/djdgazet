@@ -1,8 +1,7 @@
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
-import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { I18nService } from '../../services/i18n.service';
-import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -12,26 +11,11 @@ import { AuthService } from '../../services/auth.service';
 })
 export class HeaderComponent {
   protected readonly i18n = inject(I18nService);
-  protected readonly auth = inject(AuthService);
 
   @Output() openAuth = new EventEmitter<'login' | 'signup'>();
 
   readonly mobileMenuOpen = signal(false);
   readonly searchOpen = signal(false);
-
-  readonly today = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  readonly todayEn = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
 
   readonly categories = [
     { key: 'politics', route: '/category/politics', i18n: 'nav.politics' },
@@ -55,9 +39,5 @@ export class HeaderComponent {
 
   toggleLang() {
     this.i18n.toggle();
-  }
-
-  logout() {
-    this.auth.logout();
   }
 }
