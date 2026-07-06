@@ -707,16 +707,45 @@ app.get('/api/feedback', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// ─── GET /api/users — liste des comptes (admin DJD) ───────────────────────────
+// ─── GET /api/users — liste paginée des comptes (admin DJD), défilement infini ─
+// Toutes les infos du compte SAUF mot de passe, avatar et terms_accepted.
 app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
+  const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   try {
-    const { rows } = await db.query(
-      `SELECT id, nom, prenoms, username, email, avatar, plan, is_admin, email_verified, disabled, created_at, deleted_at
-       FROM users ORDER BY created_at DESC LIMIT 1000`
-    );
-    res.json(rows);
+    const [list, count] = await Promise.all([
+      db.query(
+        `SELECT id, nom, prenoms, username, email, date_naissance, telephone, pays, ville, genre,
+                notif_email, plan, is_admin, email_verified, disabled, created_at, deleted_at
+         FROM users ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM users`),
+    ]);
+    const total = count.rows[0].total;
+    res.json({ users: list.rows, total, offset, limit, hasMore: offset + list.rows.length < total });
   } catch (err) {
     console.error('Users list error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ─── PATCH /api/users/:id/admin — promouvoir/rétrograder un admin (admin DJD) ──
+app.patch('/api/users/:id/admin', requireAuth, requireAdmin, async (req, res) => {
+  const isAdmin  = !!req.body.is_admin;
+  const targetId = parseInt(req.params.id, 10);
+  if (targetId === req.user.id)
+    return res.status(400).json({ error: 'Vous ne pouvez pas modifier votre propre statut administrateur.' });
+  try {
+    const { rows } = await db.query(
+      'UPDATE users SET is_admin = $1 WHERE id = $2 RETURNING id, is_admin, username',
+      [isAdmin, targetId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    logActivity(req, isAdmin ? 'user.promote' : 'user.demote', `@${rows[0].username}`);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('User admin update error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
@@ -789,14 +818,21 @@ app.get('/api/stats', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// ─── GET /api/activity — journal d'activité (admin DJD) ───────────────────────
+// ─── GET /api/activity — journal d'activité paginé (admin DJD), défilement infini
 app.get('/api/activity', requireAuth, requireAdmin, async (req, res) => {
+  const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   try {
-    const { rows } = await db.query(
-      `SELECT id, actor_name, action, target, created_at
-       FROM activity_log ORDER BY created_at DESC, id DESC LIMIT 200`
-    );
-    res.json(rows);
+    const [list, count] = await Promise.all([
+      db.query(
+        `SELECT id, actor_name, action, target, created_at
+         FROM activity_log ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM activity_log`),
+    ]);
+    const total = count.rows[0].total;
+    res.json({ activity: list.rows, total, offset, limit, hasMore: offset + list.rows.length < total });
   } catch (err) {
     console.error('Activity list error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1684,7 +1720,7 @@ app.post('/api/alerts', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { rows } = await db.query(
       `INSERT INTO alerts (kind, title, source, sources, url, context, level, notify, sectors, source_types, social_networks, published_at, created_by)
-       VALUES ('realtime',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12, NOW()),$13)
+       VALUES ('realtime',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,COALESCE($11, NOW()),$12)
        RETURNING id, kind, title, source, sources, url, context, level, notify, sectors, source_types, social_networks, published_at, created_at`,
       [a.title, a.source, a.sources, a.url, a.context, a.level, a.notify, a.sectors, a.source_types, a.social_networks, a.published_at, req.user.id]
     );

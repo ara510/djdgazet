@@ -52,9 +52,7 @@ export class DashboardComponent implements OnDestroy {
   constructor() {
     // Verrouille le défilement de la page derrière l'overlay plein écran (évite le double scrollbar).
     document.body.style.overflow = 'hidden';
-    // Rafraîchit la liste des conversations (badge + vue) tant que le dashboard est ouvert.
-    this.convPoll = setInterval(() => { if (this.isAdmin) this.loadConversations(true); }, 10_000);
-    if (this.isAdmin) this.loadConversations(true);
+    // (La messagerie, les retours, les utilisateurs et le journal ont été déplacés dans l'espace /admin.)
     // Onglet par défaut : Temps réel (admin + Dédiée) ; sinon Récap quotidien (le temps réel est réservé à la Dédiée).
     if (this.isAdmin || this.userLevel >= 2) { this.alerts.load(); }
     else { this.optionKind.set('daily'); this.veille.load(this.currentFilters()); }

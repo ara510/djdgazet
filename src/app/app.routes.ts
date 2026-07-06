@@ -41,6 +41,12 @@ export const routes: Routes = [
     title: 'Gestion des articles — Headlines',
   },
   {
+    path: 'admin',
+    loadComponent: () =>
+      import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+    title: 'Administration — Headlines',
+  },
+  {
     path: 'favoris',
     loadComponent: () =>
       import('./pages/favorites/favorites.component').then((m) => m.FavoritesComponent),
