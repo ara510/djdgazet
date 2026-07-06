@@ -1,0 +1,133 @@
+<section class="container-news py-10">
+  <!-- En-tête secteur -->
+  <div class="mb-8 border-b border-silver-200 pb-5">
+    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gazety-red mb-1">
+      {{ i18n.isFrench() ? 'Secteur' : 'Sector' }}
+    </p>
+    <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark">{{ sectorLabel() }}</h1>
+  </div>
+
+  <!-- Bandeau gating -->
+  @if (hasLocked()) {
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center gap-3 bg-gold-50 border border-gold-200 rounded-sm px-5 py-4">
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-gazety-dark">
+          {{ loggedIn()
+            ? (i18n.isFrench() ? 'Contenu réservé aux abonnés payants' : 'Reserved for paid subscribers')
+            : (i18n.isFrench() ? 'Créez un compte pour accéder aux veilles' : 'Create an account to access the watch') }}
+        </p>
+        <p class="text-xs text-silver-600 mt-0.5">
+          {{ loggedIn()
+            ? (i18n.isFrench() ? 'Passez à un abonnement Sectorielle ou Dédiée pour lire l’intégralité.' : 'Upgrade to a Sector or Dedicated plan to read in full.')
+            : (i18n.isFrench() ? 'Les visiteurs voient les titres et un aperçu. L’accès complet nécessite un compte.' : 'Visitors see titles and a preview. Full access requires an account.') }}
+        </p>
+      </div>
+      @if (loggedIn()) {
+        <a routerLink="/abonnements" class="btn-primary text-sm whitespace-nowrap">
+          {{ i18n.isFrench() ? 'Voir les abonnements' : 'See plans' }}
+        </a>
+      } @else {
+        <button type="button" (click)="signup()" class="btn-primary text-sm whitespace-nowrap">
+          {{ i18n.isFrench() ? 'Créer un compte' : 'Create account' }}
+        </button>
+      }
+    </div>
+  }
+
+  <!-- Veilles -->
+  <h2 class="font-display font-bold text-xl text-gazety-dark mb-4">
+    {{ i18n.isFrench() ? 'Veilles' : 'Watch' }}
+  </h2>
+
+  @if (loading()) {
+    <p class="text-silver-500 text-sm">{{ i18n.isFrench() ? 'Chargement…' : 'Loading…' }}</p>
+  } @else if (!hasAny()) {
+    <p class="text-silver-500 text-sm">{{ i18n.isFrench() ? 'Aucune veille dans ce secteur pour le moment.' : 'No watch items in this sector yet.' }}</p>
+  } @else {
+    @for (g of groups(); track g.key) {
+      <h3 class="text-xs font-semibold uppercase tracking-[0.12em] text-silver-500 mb-3 mt-6 first:mt-0">{{ groupLabel(g.key) }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (v of g.items; track v.id) {
+        <article (click)="openVeille(v)"
+                 class="group cursor-pointer bg-white border border-silver-200 rounded-sm p-4 flex flex-col gap-2 h-48 overflow-hidden hover:border-gazety-red transition-colors">
+          <!-- Titre (en haut) — secteur en repli si la veille n'a pas de titre -->
+          <h3 class="font-display font-bold text-base text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors shrink-0">
+            {{ cardTitle(v) }}
+          </h3>
+
+          @if (v.excerpt) {
+            <p class="text-sm text-silver-600 leading-relaxed line-clamp-2 flex-1">{{ v.excerpt }}…</p>
+          } @else {
+            <span class="flex-1"></span>
+          }
+
+          <!-- Sources (en bas) : types + réseaux colorés + nom de source -->
+          <div class="flex items-center gap-1.5 flex-wrap shrink-0">
+            @for (t of typesOf(v); track t) {
+              @if (t === 'social' && networksOf(v).length) {
+                @for (n of networksOf(v); track n) {
+                  <span class="sv-net" [attr.data-net]="n" [title]="networkLabel(n)">
+                    <span class="sv-icon"><app-veille-icon [type]="'social'" [network]="n"></app-veille-icon></span>
+                  </span>
+                }
+              } @else {
+                <span class="sv-type" [attr.data-type]="t">
+                  <span class="sv-icon"><app-veille-icon [type]="t"></app-veille-icon></span>
+                  {{ typeLabel(t) }}
+                </span>
+              }
+            }
+            @if (v.source) {
+              <span class="text-[11px] text-silver-500 truncate max-w-[9rem]">· {{ v.source }}</span>
+            }
+          </div>
+
+          <div class="flex items-center justify-between shrink-0">
+            <span class="text-[11px] text-silver-500">{{ formatDate(v.published_at) }}</span>
+            @if (v.locked) {
+              <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-gazety-red">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                {{ loggedIn() ? (i18n.isFrench() ? 'Abonnement requis' : 'Plan required') : (i18n.isFrench() ? 'Compte requis' : 'Account') }}
+              </span>
+            } @else {
+              <span class="text-[11px] font-semibold text-gazety-red opacity-0 group-hover:opacity-100 transition-opacity">{{ i18n.isFrench() ? 'Lire →' : 'Read →' }}</span>
+            }
+          </div>
+        </article>
+        }
+      </div>
+    }
+  }
+
+  <!-- Articles correspondants -->
+  @if (articles().length > 0) {
+    <h2 class="font-display font-bold text-xl text-gazety-dark mt-12 mb-4">
+      {{ i18n.isFrench() ? 'Articles' : 'Articles' }}
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      @for (a of articles(); track a.id) {
+        <a [routerLink]="['/article', a.id]" class="group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
+          @if (a.image) {
+            <div class="h-40 bg-silver-100 overflow-hidden">
+              <img [src]="a.image" [alt]="a.image_alt || a.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+            </div>
+          }
+          <div class="p-4 flex flex-col gap-1.5 flex-1">
+            <h3 class="font-display font-bold text-base text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</h3>
+            @if (a.description) {
+              <p class="text-sm text-silver-600 leading-relaxed line-clamp-3">
+                {{ articleExcerpt(a.description) }}…
+                <span class="text-gazety-red font-semibold whitespace-nowrap">{{ i18n.isFrench() ? 'lire la suite' : 'read more' }}</span>
+              </p>
+            }
+            <div class="mt-auto pt-2 flex items-center gap-2 text-[11px] text-silver-500">
+              <span class="truncate">{{ a.author }}</span>
+              @if (a.read_minutes) { <span>· {{ a.read_minutes }} min</span> }
+              <span>· {{ a.views }} {{ i18n.isFrench() ? 'vues' : 'views' }}</span>
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+  }
+</section>

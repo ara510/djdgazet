@@ -1,0 +1,45 @@
+:host {
+  // Couleurs des types de source (identiques à la veille / dashboard)
+  --vp-web: #8B6B3D; --vp-social: #2f6fb0; --vp-radio: #7d5ba6; --vp-tv: #c0563b; --vp-presse: #2e8b6b; --vp-institution: #0e7490;
+  // Couleurs de marque des réseaux sociaux
+  --net-facebook: #1877F2; --net-youtube: #FF0000; --net-instagram: #E4405F; --net-x: #1d1d1f; --net-linkedin: #0A66C2;
+}
+
+// Chip de type de source (pastille colorée + icône)
+.sv-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.16rem 0.5rem 0.16rem 0.38rem;
+  border-radius: 20px;
+  color: #fff;
+  background: #6B6860;
+
+  &[data-type="web"]    { background: var(--vp-web); }
+  &[data-type="social"] { background: var(--vp-social); }
+  &[data-type="radio"]  { background: var(--vp-radio); }
+  &[data-type="tv"]     { background: var(--vp-tv); }
+  &[data-type="presse"] { background: var(--vp-presse); }
+  &[data-type="institution"] { background: var(--vp-institution); }
+}
+
+// Réseau social : icône seule en couleur de marque (pas de pastille)
+.sv-net {
+  display: inline-flex;
+  align-items: center;
+  color: #6B6860;
+
+  &[data-net="facebook"]  { color: var(--net-facebook); }
+  &[data-net="youtube"]   { color: var(--net-youtube); }
+  &[data-net="instagram"] { color: var(--net-instagram); }
+  &[data-net="x"]         { color: var(--net-x); }
+  &[data-net="linkedin"]  { color: var(--net-linkedin); }
+
+  .sv-icon { width: 16px; height: 16px; }
+}
+
+.sv-icon { width: 13px; height: 13px; display: inline-flex; flex-shrink: 0; }

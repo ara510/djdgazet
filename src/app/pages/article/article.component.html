@@ -1,4 +1,130 @@
-@if (article(); as a) {
+@if (backendArticle(); as ba) {
+  <!-- ── Article rédigé par la rédaction (backend) ── -->
+  <article class="bg-white">
+    <header class="container-news max-w-4xl py-10">
+      <div class="flex items-center gap-3 mb-4 text-xs">
+        <a [routerLink]="['/secteur', ba.sector]" class="uppercase tracking-wide font-semibold text-gazety-red hover:underline">{{ sectorLabel(ba.sector) }}</a>
+        <span class="text-silver-400">{{ baDate(ba.published_at) }}</span>
+      </div>
+
+      <h1 class="font-display font-black text-3xl md:text-5xl text-gazety-dark leading-tight mb-5">{{ ba.title }}</h1>
+
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-silver-600">
+        <span class="font-semibold text-gazety-dark">{{ ba.author }}</span>
+        @if (ba.author_role) { <span>· {{ ba.author_role }}</span> }
+        @if (ba.read_minutes) { <span>· {{ ba.read_minutes }} {{ i18n.isFrench() ? 'min de lecture' : 'min read' }}</span> }
+        <span>· {{ ba.views }} {{ i18n.isFrench() ? 'vues' : 'views' }}</span>
+      </div>
+    </header>
+
+    @if (galleryImages().length) {
+      <figure class="container-news max-w-5xl">
+        <img [src]="galleryImages()[0]" [alt]="ba.image_alt || ba.title" class="w-full rounded-sm object-cover max-h-[28rem]" />
+        @if (ba.image_alt) {
+          <figcaption class="text-xs text-silver-500 mt-2 italic">{{ ba.image_alt }}</figcaption>
+        }
+
+        <!-- Galerie : bouton sous la photo principale (pas de défilement auto), s'il y a plus d'une photo -->
+        @if (galleryImages().length > 1) {
+          <button type="button" (click)="toggleGallery()"
+                  class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-silver-300 text-gazety-dark text-sm font-semibold hover:bg-silver-100 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            {{ showGallery()
+              ? (i18n.isFrench() ? 'Masquer la galerie' : 'Hide gallery')
+              : (i18n.isFrench() ? 'Galerie (' + galleryImages().length + ' photos)' : 'Gallery (' + galleryImages().length + ' photos)') }}
+          </button>
+
+          @if (showGallery()) {
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+              @for (img of galleryImages(); track img) {
+                <img [src]="img" alt="" class="w-full h-32 rounded-sm object-cover border border-silver-200" loading="lazy" />
+              }
+            </div>
+          }
+        }
+      </figure>
+    }
+
+    <div class="container-news max-w-3xl py-10">
+      @if (ba.locked) {
+        <!-- Visiteur : aperçu + création de compte pour lire -->
+        <div class="relative">
+          <p class="text-lg text-gazety-dark leading-relaxed">{{ ba.description }}…</p>
+          <div class="mt-6 border border-gold-200 bg-gold-50/60 rounded-sm p-6 text-center">
+            <svg class="w-8 h-8 mx-auto text-gazety-red mb-2" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <p class="font-display font-bold text-lg text-gazety-dark mb-1">{{ i18n.isFrench() ? 'Créez un compte pour lire la suite' : 'Create an account to read on' }}</p>
+            <p class="text-sm text-silver-600 mb-4">{{ i18n.isFrench() ? "La lecture complète des articles est gratuite avec un compte." : 'Reading full articles is free with an account.' }}</p>
+            <button (click)="signup()" class="btn-primary text-sm">{{ i18n.isFrench() ? 'Créer un compte' : 'Create account' }}</button>
+          </div>
+        </div>
+      } @else {
+        @if (ba.description) {
+          <div class="article-richtext text-lg text-gazety-dark leading-relaxed" [innerHTML]="descriptionHtml()"></div>
+        } @else {
+          <p class="text-silver-500 italic">{{ i18n.isFrench() ? 'Aucun contenu.' : 'No content.' }}</p>
+        }
+
+        <!-- Actions en bas, séparées du texte par un trait -->
+        <div class="border-t border-silver-200 mt-10 pt-6 flex items-center gap-3">
+          <button (click)="toggleFavorite()" [disabled]="favLoading()"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-sm font-semibold transition-colors disabled:opacity-60"
+                  [class.border-gazety-red]="favorite()" [class.text-gazety-red]="favorite()"
+                  [class.border-silver-300]="!favorite()" [class.text-gazety-dark]="!favorite()">
+            <svg class="w-4 h-4" [attr.fill]="favorite() ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+            {{ favorite() ? (i18n.isFrench() ? 'Enregistré' : 'Saved') : (i18n.isFrench() ? 'Enregistrer' : 'Save') }}
+          </button>
+          <button (click)="copyLink()"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-silver-300 text-gazety-dark text-sm font-semibold hover:bg-silver-100 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-1.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
+            {{ i18n.isFrench() ? 'Copier le lien' : 'Copy link' }}
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Sur le même secteur -->
+    <section class="bg-silver-50 py-12 mt-6">
+      <div class="container-news max-w-5xl">
+        <h2 class="font-display font-bold text-2xl text-gazety-dark mb-6">
+          {{ i18n.isFrench() ? 'Sur le même secteur' : 'More in this sector' }}
+        </h2>
+        @if (relatedBackend().length > 0) {
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            @for (r of relatedBackend(); track r.id) {
+              <a [routerLink]="['/article', r.id]" class="group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
+                @if (r.image) {
+                  <img [src]="r.image" alt="" class="w-full h-52 object-cover" loading="lazy" />
+                }
+                <div class="p-5 flex flex-col gap-2 flex-1">
+                  <p class="text-[10px] uppercase tracking-wide text-gazety-red font-semibold">{{ sectorLabel(r.sector) }}</p>
+                  <h3 class="font-display font-bold text-xl text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ r.title }}</h3>
+                  @if (r.description) {
+                    <p class="text-sm text-silver-600 leading-relaxed line-clamp-3">
+                      {{ relatedExcerpt(r) }}…
+                      <span class="text-gazety-red font-semibold whitespace-nowrap">{{ i18n.isFrench() ? 'lire la suite' : 'read more' }}</span>
+                    </p>
+                  }
+                  <div class="mt-auto pt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-silver-500">
+                    <span class="font-semibold text-gazety-dark">{{ r.author }}</span>
+                    @if (r.read_minutes) { <span>· {{ r.read_minutes }} {{ i18n.isFrench() ? 'min de lecture' : 'min read' }}</span> }
+                    <span>· {{ baDate(r.published_at) }}</span>
+                  </div>
+                </div>
+              </a>
+            }
+          </div>
+        } @else {
+          <p class="text-silver-500 text-sm">
+            {{ i18n.isFrench()
+              ? "Pas d'autre article dans ce secteur pour le moment — restez à l'écoute !"
+              : 'No other article in this sector yet — stay tuned!' }}
+          </p>
+        }
+      </div>
+    </section>
+  </article>
+} @else {
+  @if (article(); as a) {
   <article class="bg-white">
     <!-- Breadcrumb -->
     <div class="container-news py-4 border-b border-silver-200">
@@ -118,8 +244,8 @@
           </h3>
           <p class="text-silver-600 mb-6 max-w-md mx-auto">
             {{ i18n.isFrench()
-              ? 'Accédez à l\'intégralité de cet article et à tous nos contenus exclusifs avec un abonnement Gazety Pro.'
-              : 'Access this article in full and all our exclusive content with a Gazety Pro subscription.' }}
+              ? 'Accédez à l\'intégralité de cet article et à tous nos contenus exclusifs avec un abonnement Headlines Pro.'
+              : 'Access this article in full and all our exclusive content with a Headlines Pro subscription.' }}
           </p>
           <div class="flex flex-col sm:flex-row gap-3 justify-center">
             <a routerLink="/abonnements" class="btn-primary py-3 px-6">
@@ -195,4 +321,5 @@
       {{ i18n.isFrench() ? 'Retour à l\'accueil' : 'Back to home' }}
     </a>
   </div>
+  }
 }

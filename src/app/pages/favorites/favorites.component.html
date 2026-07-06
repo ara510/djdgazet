@@ -1,0 +1,70 @@
+@if (!auth.isLoggedIn()) {
+  <div class="container-news py-20 text-center">
+    <p class="text-silver-600 mb-4">{{ fr() ? 'Connectez-vous pour voir vos favoris.' : 'Sign in to see your favorites.' }}</p>
+    <a routerLink="/" class="btn-primary text-sm">{{ fr() ? "Retour à l'accueil" : 'Back home' }}</a>
+  </div>
+} @else {
+  <section class="container-news py-10 max-w-4xl">
+    <div class="mb-8 border-b border-silver-200 pb-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gazety-red mb-1">{{ fr() ? 'Mon compte' : 'My account' }}</p>
+      <h1 class="font-display font-black text-3xl text-gazety-dark">{{ fr() ? 'Mes favoris' : 'My favorites' }}</h1>
+    </div>
+
+    @if (loading()) {
+      <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+    } @else {
+      <!-- Articles -->
+      <h2 class="font-display font-bold text-xl text-gazety-dark mb-4">{{ fr() ? 'Articles' : 'Articles' }}</h2>
+      @if (articles().length === 0) {
+        <p class="text-silver-500 text-sm mb-10">{{ fr() ? 'Aucun article enregistré.' : 'No saved articles.' }}</p>
+      } @else {
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+          @for (a of articles(); track a.id) {
+            <a [routerLink]="['/article', a.id]" class="group relative bg-white border border-silver-200 rounded-sm overflow-hidden flex hover:border-gazety-red transition-colors">
+              @if (a.image) {
+                <img [src]="a.image" alt="" class="w-24 h-full object-cover shrink-0" />
+              }
+              <div class="p-3 flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 text-[10px] uppercase tracking-wide text-silver-500">
+                  <span class="text-gazety-red font-semibold">{{ sectorLabel(a.sector) }}</span>
+                  <span>· {{ a.views }} {{ fr() ? 'vues' : 'views' }}</span>
+                </div>
+                <h3 class="font-display font-bold text-sm text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</h3>
+                <p class="text-[11px] text-silver-500 mt-1 truncate">{{ a.author }}@if (a.read_minutes) { · {{ a.read_minutes }} min}</p>
+              </div>
+              <button (click)="removeArticle(a, $event)" [title]="fr() ? 'Retirer' : 'Remove'"
+                      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 border border-silver-200 flex items-center justify-center text-gazety-red hover:bg-white">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </a>
+          }
+        </div>
+      }
+
+      <!-- Veilles -->
+      <h2 class="font-display font-bold text-xl text-gazety-dark mb-4">{{ fr() ? 'Veilles' : 'Watch' }}</h2>
+      @if (veilles().length === 0) {
+        <p class="text-silver-500 text-sm">{{ fr() ? 'Aucune veille enregistrée.' : 'No saved watch items.' }}</p>
+      } @else {
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          @for (v of veilles(); track v.id) {
+            <article (click)="openVeille(v)" class="group relative cursor-pointer bg-white border border-silver-200 rounded-sm p-3 hover:border-gazety-red transition-colors">
+              <div class="flex items-center gap-2 mb-1 text-[10px] uppercase tracking-wide text-silver-500">
+                <span class="text-gazety-red font-semibold">{{ sectorLabel(v.sector) }}</span>
+                <span>· {{ formatDate(v.published_at) }}</span>
+              </div>
+              <h3 class="font-display font-bold text-sm text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">
+                {{ v.title || sectorLabel(v.sector) }}
+              </h3>
+              @if (v.excerpt) { <p class="text-[11px] text-silver-500 mt-1 line-clamp-2">{{ v.excerpt }}</p> }
+              <button (click)="removeVeille(v, $event)" [title]="fr() ? 'Retirer' : 'Remove'"
+                      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 border border-silver-200 flex items-center justify-center text-gazety-red hover:bg-white">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </article>
+          }
+        </div>
+      }
+    }
+  </section>
+}

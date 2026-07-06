@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Variables du sous-système Veille (dashboard/vitrine portés depuis l'ancien projet) ────────
+   Palette + polices utilisées par les composants veille (SCSS scopé). N'affecte
+   pas le reste du site Gazety (qui reste sur Tailwind). */
+:root {
+  --color-bg:         #F4F6FA;
+  --color-surface:    #FFFFFF;
+  --color-ink:        #1C2637;
+  --color-ink-muted:  #5B6472;
+  --color-accent:     #1E5FD4;
+  --color-accent-lt:  #4B83EA;
+  --color-border:     #DFE4EC;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --section-pad: clamp(5rem, 10vw, 9rem);
+  --container:   min(1200px, 100% - 3rem);
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -37,7 +54,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-gazety-red text-gazety-dark font-semibold px-5 py-2.5 rounded-sm hover:bg-gold-600 transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-2 bg-gazety-red text-white font-semibold px-5 py-2.5 rounded-sm hover:bg-gold-700 transition-colors duration-200;
   }
 
   .btn-outline {

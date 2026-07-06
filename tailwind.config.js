@@ -5,12 +5,12 @@ module.exports = {
     extend: {
       colors: {
         gazety: {
-          red: "#d4b66a",
-          dark: "#2d3944",
-          gray: "#545e67",
-          accent: "#d8be7b",
-          black: "#000000",
-          green: "#545e67",
+          red: "#1e5fd4",     // accent principal = bleu du logo Haydlines
+          dark: "#1c2637",    // bleu-nuit du logo
+          gray: "#3a4a63",    // gris-bleu
+          accent: "#4b83ea",  // bleu clair
+          black: "#0f1620",
+          green: "#3a4a63",
         },
         silver: {
           50: "#F8F9FA",
@@ -23,26 +23,26 @@ module.exports = {
           700: "#545e67",
         },
         gold: {
-          50: "#fdf9ef",
-          100: "#faf2dd",
-          200: "#f3e3b8",
-          300: "#ebd292",
-          400: "#d8be7b",
-          500: "#d4b66a",
-          600: "#b89853",
-          700: "#967a43",
+          50: "#eff5ff",
+          100: "#dbe8fe",
+          200: "#bfd6fd",
+          300: "#93b8fb",
+          400: "#6098f6",
+          500: "#3b78ec",
+          600: "#1e5fd4",
+          700: "#1b4fb0",
         },
         vip: {
-          50: "#fdf9ef",
-          100: "#faf2dd",
-          200: "#f3e3b8",
-          300: "#d4b66a",
-          400: "#545e67",
-          500: "#2d3944",
-          600: "#2d3944",
-          700: "#1a2530",
-          800: "#000000",
-          900: "#000000",
+          50: "#eff5ff",
+          100: "#dbe8fe",
+          200: "#bfd6fd",
+          300: "#4b83ea",
+          400: "#1e5fd4",
+          500: "#1c2637",
+          600: "#1c2637",
+          700: "#141d2b",
+          800: "#0f1620",
+          900: "#0a0f17",
         },
       },
       fontFamily: {

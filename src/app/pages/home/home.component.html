@@ -1,296 +1,115 @@
-<div class="bg-white">
-  <!-- HERO SECTION -->
-  <app-hero />
-
-  <!-- TOP 4 GRID -->
-  <section class="container-news py-6 border-t border-silver-200">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      @for (article of featuredAfterHero; track article.id) {
-        <app-news-card
-          [article]="article"
-          variant="vertical"
-          [showExcerpt]="false"
-        />
+<!-- ── À la une : dernier article ── -->
+@if (hero(); as h) {
+  <section class="container-news pt-8">
+    <a [routerLink]="['/article', h.id]" class="group grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+      @if (h.image) {
+        <div class="h-64 lg:h-80 rounded-sm overflow-hidden bg-silver-100">
+          <img [src]="h.image" [alt]="h.image_alt || h.title" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+        </div>
       }
-    </div>
-  </section>
-
-  <!-- MOST READ + PREMIUM EXCLUSIVE BAND -->
-  <section class="bg-silver-50 py-10 mt-6">
-    <div class="container-news grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- Most read -->
-      <div class="lg:col-span-2">
-        <div class="flex items-center justify-between border-b-2 border-gazety-dark pb-2 mb-5">
-          <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-dark">
-            {{ i18n.t('section.most_read') }}
-          </h2>
-          <span class="text-xs font-semibold text-silver-500">Top 5</span>
-        </div>
-        <ol class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          @for (article of mostRead; track article.id; let i = $index) {
-            <li class="flex gap-4 items-start py-2">
-              <span class="font-display font-black text-4xl leading-none shrink-0"
-                [class.text-gazety-red]="i < 3"
-                [class.text-silver-300]="i >= 3"
-              >
-                {{ i + 1 }}
-              </span>
-              <div class="flex-1 pt-1">
-                <app-news-card
-                  [article]="article"
-                  variant="minimal"
-                  [showCategory]="true"
-                  [showImage]="false"
-                  [showExcerpt]="false"
-                />
-              </div>
-            </li>
-          }
-        </ol>
-      </div>
-
-      <!-- Premium exclusive -->
       <div>
-        <div class="bg-white border-2 border-gold-500 p-6 relative">
-          <div class="absolute -top-3 left-4">
-            <span class="bg-gold-500 text-gazety-dark text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-sm flex items-center gap-1">
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z"/></svg>
-              {{ i18n.t('section.exclusive') }}
-            </span>
-          </div>
-          <div class="space-y-5 divide-y divide-silver-200 mt-2">
-            @for (article of premium; track article.id; let i = $index) {
-              <div [class.pt-4]="i > 0">
-                <app-news-card
-                  [article]="article"
-                  variant="compact"
-                  [showImage]="i === 0"
-                />
-              </div>
-            }
-          </div>
-          <a routerLink="/abonnements" class="mt-5 block text-center btn-primary w-full text-sm">
-            {{ i18n.t('common.subscribe_to_read') }}
-          </a>
+        <div class="flex items-center gap-3 mb-3 text-xs">
+          <span class="uppercase tracking-wide font-semibold text-gazety-red">{{ sectorLabel(h.sector) }}</span>
+          <span class="text-silver-400">{{ formatDate(h.published_at) }}</span>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- POLITICS + ECONOMY -->
-  <section class="container-news py-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
-    <!-- Politics -->
-    <div>
-      <div class="flex items-center justify-between border-b-2 border-gazety-red pb-2 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-red">
-          {{ i18n.t('section.politics') }}
-        </h2>
-        <a routerLink="/category/politics" class="text-xs font-semibold text-gazety-dark hover:text-gazety-red flex items-center gap-1">
-          {{ i18n.t('common.viewall') }}
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        </a>
-      </div>
-      <div class="space-y-5">
-        @if (politics[0]) {
-          <app-news-card [article]="politics[0]" variant="vertical" />
+        <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark leading-tight group-hover:text-gazety-red transition-colors mb-3">{{ h.title }}</h1>
+        @if (h.description) {
+          <p class="text-silver-600 leading-relaxed line-clamp-3 mb-4">{{ excerpt(h.description, 220) }}…</p>
         }
-        @for (article of politics.slice(1); track article.id) {
-          <div class="news-grid-divider">
-            <app-news-card [article]="article" variant="horizontal" [showImage]="false" />
-          </div>
-        }
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-silver-500">
+          <span class="font-semibold text-gazety-dark">{{ h.author }}</span>
+          @if (h.read_minutes) { <span>· {{ h.read_minutes }} {{ fr() ? 'min de lecture' : 'min read' }}</span> }
+          <span>· {{ h.views }} {{ fr() ? 'vues' : 'views' }}</span>
+        </div>
       </div>
-    </div>
-
-    <!-- Economy -->
-    <div>
-      <div class="flex items-center justify-between border-b-2 border-gazety-red pb-2 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-red">
-          {{ i18n.t('section.economy') }}
-        </h2>
-        <a routerLink="/category/economy" class="text-xs font-semibold text-gazety-dark hover:text-gazety-red flex items-center gap-1">
-          {{ i18n.t('common.viewall') }}
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        </a>
-      </div>
-      <div class="space-y-5">
-        @if (economy[0]) {
-          <app-news-card [article]="economy[0]" variant="vertical" />
-        }
-        @for (article of economy.slice(1); track article.id) {
-          <div class="news-grid-divider">
-            <app-news-card [article]="article" variant="horizontal" [showImage]="false" />
-          </div>
-        }
-      </div>
-    </div>
+    </a>
   </section>
+}
 
-  <!-- BANNER CTA -->
-  <section class="bg-gazety-dark text-white py-10">
-    <div class="container-news grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-      <div class="lg:col-span-7">
-        <span class="text-gazety-accent text-xs font-bold uppercase tracking-[0.2em] mb-2 inline-block">
-          {{ i18n.isFrench() ? 'Veille stratégique' : 'Strategic intelligence' }}
-        </span>
-        <h2 class="font-display font-bold text-3xl md:text-4xl text-balance mb-3">
-          {{ i18n.isFrench()
-            ? 'L\'information de référence sur Madagascar, en un abonnement.'
-            : 'Reference information on Madagascar, in one subscription.' }}
-        </h2>
-        <p class="text-silver-300 text-base max-w-2xl">
-          {{ i18n.isFrench()
-            ? 'Rapports sectoriels, analyses exclusives, briefings hebdomadaires : choisissez la veille adaptée à vos besoins.'
-            : 'Sector reports, exclusive analyses, weekly briefings: choose the watch tailored to your needs.' }}
-        </p>
-      </div>
-      <div class="lg:col-span-5 flex flex-col sm:flex-row gap-3 lg:justify-end">
-        <a routerLink="/abonnements" class="btn-primary py-3 px-6 text-base">
-          {{ i18n.isFrench() ? 'Découvrir les abonnements' : 'Discover subscriptions' }}
-        </a>
-        <a href="#" class="inline-flex items-center justify-center gap-2 border-2 border-white text-white font-semibold px-6 py-3 rounded-sm hover:bg-white hover:text-gazety-dark transition-colors">
-          {{ i18n.isFrench() ? 'Voir une démo' : 'Watch a demo' }}
-        </a>
-      </div>
-    </div>
-  </section>
+<!-- ── Derniers articles ── -->
+<section class="container-news py-10">
+  <h2 class="font-display font-bold text-2xl text-gazety-dark mb-6 pb-2 border-b-2 border-gazety-red inline-block">
+    {{ fr() ? 'Derniers articles' : 'Latest articles' }}
+  </h2>
 
-  <!-- SOCIETY + CULTURE + SPORT -->
-  <section class="container-news py-10">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <!-- Society -->
-      <div>
-        <div class="flex items-center justify-between border-b-2 border-gazety-red pb-2 mb-4">
-          <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-red">
-            {{ i18n.t('section.society') }}
-          </h2>
-        </div>
-        <div class="space-y-4">
-          @for (article of society; track article.id; let i = $index) {
-            @if (i === 0) {
-              <app-news-card [article]="article" variant="vertical" [showExcerpt]="false" />
-            } @else {
-              <div class="border-t border-silver-200 pt-4">
-                <app-news-card [article]="article" variant="minimal" />
-              </div>
-            }
-          }
-        </div>
-      </div>
-
-      <!-- Culture -->
-      <div>
-        <div class="flex items-center justify-between border-b-2 border-gazety-red pb-2 mb-4">
-          <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-red">
-            {{ i18n.t('section.culture') }}
-          </h2>
-        </div>
-        <div class="space-y-4">
-          @for (article of culture; track article.id; let i = $index) {
-            @if (i === 0) {
-              <app-news-card [article]="article" variant="vertical" [showExcerpt]="false" />
-            } @else {
-              <div class="border-t border-silver-200 pt-4">
-                <app-news-card [article]="article" variant="minimal" />
-              </div>
-            }
-          }
-        </div>
-      </div>
-
-      <!-- Sport -->
-      <div>
-        <div class="flex items-center justify-between border-b-2 border-gazety-red pb-2 mb-4">
-          <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-red">
-            {{ i18n.t('section.sport') }}
-          </h2>
-        </div>
-        <div class="space-y-4">
-          @for (article of sport; track article.id; let i = $index) {
-            @if (i === 0) {
-              <app-news-card [article]="article" variant="vertical" [showExcerpt]="false" />
-            } @else {
-              <div class="border-t border-silver-200 pt-4">
-                <app-news-card [article]="article" variant="minimal" />
-              </div>
-            }
-          }
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ENVIRONMENT — full image band -->
-  <section class="bg-gazety-green/5 py-10 border-y-2 border-gazety-green/20">
-    <div class="container-news">
-      <div class="flex items-center justify-between border-b-2 border-gazety-green pb-2 mb-6">
-        <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-green flex items-center gap-2">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z"/></svg>
-          {{ i18n.t('section.environment') }}
-        </h2>
-        <a routerLink="/category/environment" class="text-xs font-semibold text-gazety-green hover:underline flex items-center gap-1">
-          {{ i18n.t('common.viewall') }}
-        </a>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        @for (article of environment; track article.id) {
-          <app-news-card [article]="article" variant="vertical" [showExcerpt]="true" />
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- OPINIONS + LATEST -->
-  <section class="container-news py-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
-    <!-- Opinions -->
-    <div class="lg:col-span-1">
-      <div class="bg-gazety-dark text-white p-6">
-        <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-accent border-b border-gazety-accent/30 pb-3 mb-5">
-          {{ i18n.t('section.opinion') }}
-        </h2>
-        <div class="space-y-5 divide-y divide-white/10">
-          @for (article of opinion; track article.id; let i = $index) {
-            <div [class.pt-5]="i > 0" class="text-white">
-              <span class="text-[10px] uppercase tracking-wider font-bold text-gazety-accent">
-                {{ i18n.isFrench() ? 'Tribune' : 'Op-ed' }}
-              </span>
-              <h3 class="font-display font-bold text-lg leading-snug mt-1 mb-2 italic">
-                "{{ i18n.isFrench() ? article.title.fr : article.title.en }}"
-              </h3>
-              <p class="text-xs text-silver-300 line-clamp-3 mb-2">
-                {{ i18n.isFrench() ? article.excerpt.fr : article.excerpt.en }}
-              </p>
-              <span class="text-xs text-silver-400">
-                — {{ article.author }}
-              </span>
+  @if (loadingArticles()) {
+    <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+  } @else if (articles().length === 0) {
+    <p class="text-silver-500 text-sm">{{ fr() ? 'Aucun article publié pour le moment.' : 'No articles published yet.' }}</p>
+  } @else {
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      @for (a of rest(); track a.id) {
+        <a [routerLink]="['/article', a.id]" class="group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
+          @if (a.image) {
+            <div class="h-44 bg-silver-100 overflow-hidden">
+              <img [src]="a.image" [alt]="a.image_alt || a.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
             </div>
           }
-        </div>
-      </div>
+          <div class="p-4 flex flex-col gap-2 flex-1">
+            <div class="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+              <span class="text-gazety-red font-semibold">{{ sectorLabel(a.sector) }}</span>
+              <span class="text-silver-400">{{ formatDate(a.published_at) }}</span>
+            </div>
+            <h3 class="font-display font-bold text-lg text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</h3>
+            @if (a.description) {
+              <p class="text-sm text-silver-600 leading-relaxed line-clamp-2">{{ excerpt(a.description) }}…</p>
+            }
+            <div class="mt-auto pt-2 text-[11px] text-silver-500">
+              {{ a.author }}@if (a.read_minutes) { · {{ a.read_minutes }} min} · {{ a.views }} {{ fr() ? 'vues' : 'views' }}
+            </div>
+          </div>
+        </a>
+      }
     </div>
 
-    <!-- Latest -->
-    <div class="lg:col-span-2">
-      <div class="flex items-center justify-between border-b-2 border-gazety-dark pb-2 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-[0.15em] text-gazety-dark">
-          {{ i18n.t('section.latest') }}
-        </h2>
-        <a href="#" class="text-xs font-semibold text-gazety-dark hover:text-gazety-red flex items-center gap-1">
-          {{ i18n.t('common.viewall') }}
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        </a>
-      </div>
-      <div class="space-y-5 divide-y divide-silver-200">
-        @for (article of latest; track article.id; let i = $index) {
-          <div [class.pt-5]="i > 0">
-            <app-news-card
-              [article]="article"
-              variant="horizontal"
-              [showExcerpt]="false"
-            />
-          </div>
+    @if (!loggedIn()) {
+      <p class="text-center text-sm text-silver-500 mt-6">
+        {{ fr() ? 'Créez un compte gratuit pour lire les articles en entier.' : 'Create a free account to read full articles.' }}
+        <button (click)="signup()" class="text-gazety-red font-semibold hover:underline ml-1">{{ fr() ? 'Créer un compte' : 'Create account' }}</button>
+      </p>
+    }
+  }
+</section>
+
+<!-- ── Veille média ── -->
+<section class="bg-silver-50 py-10">
+  <div class="container-news">
+    <div class="flex items-center justify-between gap-4 mb-6">
+      <h2 class="font-display font-bold text-2xl text-gazety-dark">{{ fr() ? 'Veille média' : 'Media watch' }}</h2>
+      <button (click)="openVeille()" class="btn-primary text-sm whitespace-nowrap">
+        {{ loggedIn() ? (fr() ? 'Ouvrir ma veille' : 'Open my watch') : (fr() ? 'Créer un compte' : 'Create account') }}
+      </button>
+    </div>
+
+    @if (veillePreview().length === 0) {
+      <p class="text-silver-500 text-sm">{{ fr() ? 'Aucune veille pour le moment.' : 'No watch items yet.' }}</p>
+    } @else {
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (v of veillePreview(); track v.id) {
+          <article (click)="openVeille()" class="group cursor-pointer bg-white border border-silver-200 rounded-sm p-4 flex flex-col gap-2 h-40 overflow-hidden hover:border-gazety-red transition-colors">
+            <div class="flex items-center gap-2 text-[10px] uppercase tracking-wide">
+              @if (v.sector) { <span class="text-gazety-red font-semibold">{{ sectorLabel(v.sector) }}</span> }
+              <span class="text-silver-400">{{ formatDate(v.published_at) }}</span>
+            </div>
+            <h3 class="font-display font-bold text-base text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">
+              {{ v.title || sectorLabel(v.sector) || (fr() ? 'Veille' : 'Watch') }}
+            </h3>
+            @if (v.excerpt) { <p class="text-sm text-silver-600 leading-relaxed line-clamp-2 flex-1">{{ v.excerpt }}</p> }
+            @if (v.locked) {
+              <span class="mt-auto inline-flex items-center gap-1 text-[11px] font-semibold text-gazety-red">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                {{ loggedIn() ? (fr() ? 'Abonnement requis' : 'Plan required') : (fr() ? 'Compte requis' : 'Account required') }}
+              </span>
+            }
+          </article>
         }
       </div>
-    </div>
-  </section>
-</div>
+
+      @if (!loggedIn()) {
+        <p class="text-center text-sm text-silver-500 mt-6">
+          {{ fr() ? 'Aperçu limité à 5 veilles — créez un compte pour tout consulter.' : 'Preview limited to 5 items — create an account to see everything.' }}
+        </p>
+      }
+    }
+  </div>
+</section>

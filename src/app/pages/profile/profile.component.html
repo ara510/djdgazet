@@ -1,0 +1,226 @@
+@if (auth.currentUser(); as u) {
+  <div class="container-news py-10 max-w-3xl">
+    <!-- En-tête profil -->
+    <div class="flex items-center gap-5 mb-8">
+      <div class="relative shrink-0">
+        @if (avatarSrc()) {
+          <img [src]="avatarSrc()" alt="" class="w-20 h-20 rounded-full object-cover border border-silver-200" />
+        } @else {
+          <div class="w-20 h-20 rounded-full bg-gazety-dark text-white flex items-center justify-center text-2xl font-display font-black">
+            {{ initials() }}
+          </div>
+        }
+        @if (editing()) {
+          <label class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-gazety-red text-white flex items-center justify-center cursor-pointer shadow hover:bg-gazety-red/90" [title]="fr() ? 'Changer la photo' : 'Change photo'">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <input type="file" accept="image/*" class="hidden" (change)="onAvatarSelected($event)" />
+          </label>
+        }
+      </div>
+      <div class="min-w-0 flex-1">
+        <h1 class="font-display font-black text-3xl text-gazety-dark leading-tight truncate">
+          {{ u.prenoms }} {{ u.nom }}
+        </h1>
+        <p class="text-silver-600 text-sm">&#64;{{ u.username }}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-semibold bg-gazety-red/10 text-gazety-red">
+            {{ fr() ? 'Abonnement' : 'Plan' }} · {{ planLabel() }}
+          </span>
+          @if (u.is_admin) {
+            <span class="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-semibold bg-gazety-dark text-white">
+              {{ fr() ? 'Administrateur' : 'Administrator' }}
+            </span>
+          }
+          @if (u.email_verified) {
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-xs font-semibold bg-emerald-50 text-emerald-700">
+              ✓ {{ fr() ? 'Email vérifié' : 'Email verified' }}
+            </span>
+          } @else {
+            <span class="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-semibold bg-amber-50 text-amber-700">
+              {{ fr() ? 'Email non vérifié' : 'Email not verified' }}
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (!editing()) {
+      <!-- ── Vue ───────────────────────────────────────────────────── -->
+      <div class="border border-silver-200 rounded-sm divide-y divide-silver-200">
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? 'Nom complet' : 'Full name' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ u.prenoms }} {{ u.nom }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? "Nom d'utilisateur" : 'Username' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">&#64;{{ u.username }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">Email</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ u.email }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? 'Date de naissance' : 'Date of birth' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ formatDate(u.date_naissance) }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? 'Téléphone' : 'Phone' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ u.telephone || '—' }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? 'Localisation' : 'Location' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ u.ville }}{{ u.ville && u.pays ? ', ' : '' }}{{ u.pays || (u.ville ? '' : '—') }}</span>
+        </div>
+        <div class="flex items-center justify-between px-5 py-3.5">
+          <span class="text-sm font-semibold text-silver-600">{{ fr() ? 'Membre depuis' : 'Member since' }}</span>
+          <span class="text-sm text-gazety-dark font-medium">{{ formatDate(u.created_at) }}</span>
+        </div>
+      </div>
+
+      @if (!u.email_verified) {
+        <div class="mt-6 border border-amber-200 bg-amber-50/60 rounded-sm p-5">
+          <p class="text-sm font-semibold text-amber-800 mb-1">{{ fr() ? 'Vérifiez votre adresse email' : 'Verify your email address' }}</p>
+          <p class="text-xs text-amber-700/90 mb-3">
+            {{ fr() ? 'Recevez un code à 6 chiffres par email pour confirmer votre adresse.' : 'Receive a 6-digit code by email to confirm your address.' }}
+          </p>
+
+          @if (!otpStep()) {
+            <button (click)="resendOtp()" [disabled]="otpSending()" class="btn-primary text-sm disabled:opacity-60">
+              {{ otpSending() ? (fr() ? 'Envoi…' : 'Sending…') : (fr() ? 'Envoyer le code' : 'Send the code') }}
+            </button>
+          } @else {
+            <div class="flex flex-wrap items-center gap-2">
+              <input type="text" inputmode="numeric" maxlength="6" [ngModel]="otpCode()" (ngModelChange)="otpCode.set($event)" name="otp"
+                     placeholder="000000"
+                     class="w-32 px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-center tracking-[0.3em] font-mono text-base" />
+              <button (click)="verifyOtp()" [disabled]="otpVerifying()" class="btn-primary text-sm disabled:opacity-60">
+                {{ otpVerifying() ? (fr() ? 'Vérification…' : 'Verifying…') : (fr() ? 'Valider' : 'Verify') }}
+              </button>
+              <button (click)="resendOtp()" [disabled]="otpSending()" class="btn-ghost text-sm">
+                {{ fr() ? 'Renvoyer' : 'Resend' }}
+              </button>
+            </div>
+          }
+          @if (otpMessage()) { <p class="mt-2 text-xs text-emerald-700">{{ otpMessage() }}</p> }
+          @if (otpError()) { <p class="mt-2 text-xs text-gazety-red">{{ otpError() }}</p> }
+        </div>
+      }
+
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button (click)="startEdit()" class="btn-primary text-sm">
+          {{ fr() ? 'Modifier le profil' : 'Edit profile' }}
+        </button>
+        <a routerLink="/favoris" class="btn-ghost text-sm">
+          {{ fr() ? 'Mes favoris' : 'My favorites' }}
+        </a>
+        <a routerLink="/abonnements" class="btn-ghost text-sm">
+          {{ fr() ? 'Gérer mon abonnement' : 'Manage subscription' }}
+        </a>
+        <button (click)="logout()" class="btn-ghost text-sm text-gazety-red ml-auto">
+          {{ fr() ? 'Déconnexion' : 'Sign out' }}
+        </button>
+      </div>
+    } @else {
+      <!-- ── Édition ───────────────────────────────────────────────── -->
+      <form (submit)="$event.preventDefault(); save()" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Prénoms' : 'First name' }}</label>
+            <input type="text" [ngModel]="fPrenoms()" (ngModelChange)="fPrenoms.set($event)" name="prenoms" required
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Nom' : 'Last name' }}</label>
+            <input type="text" [ngModel]="fNom()" (ngModelChange)="fNom.set($event)" name="nom" required
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? "Nom d'utilisateur" : 'Username' }}</label>
+            <input type="text" [ngModel]="fUsername()" (ngModelChange)="fUsername.set($event)" name="username" required
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">Email</label>
+            <input type="email" [ngModel]="fEmail()" (ngModelChange)="fEmail.set($event)" name="email" required
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Date de naissance' : 'Date of birth' }}</label>
+            <input type="text" inputmode="numeric" placeholder="jj/mm/aaaa" maxlength="10"
+                   [ngModel]="fDate()" (ngModelChange)="fDate.set($event)" name="date" required
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Genre' : 'Gender' }}</label>
+            <select [ngModel]="fGenre()" (ngModelChange)="fGenre.set($event)" name="genre"
+                    class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm bg-white">
+              <option value="">{{ fr() ? 'Non précisé' : 'Unspecified' }}</option>
+              <option value="Homme">{{ fr() ? 'Homme' : 'Male' }}</option>
+              <option value="Femme">{{ fr() ? 'Femme' : 'Female' }}</option>
+              <option value="Autre">{{ fr() ? 'Autre' : 'Other' }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Téléphone' : 'Phone' }}</label>
+            <input type="tel" [ngModel]="fTel()" (ngModelChange)="fTel.set($event)" name="tel"
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Ville' : 'City' }}</label>
+            <input type="text" [ngModel]="fVille()" (ngModelChange)="fVille.set($event)" name="ville"
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Pays' : 'Country' }}</label>
+            <input type="text" [ngModel]="fPays()" (ngModelChange)="fPays.set($event)" name="pays"
+                   class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 cursor-pointer pt-1">
+          <input type="checkbox" [ngModel]="fNotif()" (ngModelChange)="fNotif.set($event)" name="notif" class="w-4 h-4 accent-gazety-red" />
+          <span class="text-sm text-gazety-dark">{{ fr() ? 'Recevoir les notifications par email' : 'Receive email notifications' }}</span>
+        </label>
+
+        @if (avatarSrc()) {
+          <button type="button" (click)="removeAvatar()" class="text-xs text-gazety-red hover:underline">
+            {{ fr() ? 'Retirer la photo' : 'Remove photo' }}
+          </button>
+        }
+
+        <!-- Changement de mot de passe (optionnel) -->
+        <div class="border-t border-silver-200 pt-4">
+          <p class="text-xs font-semibold text-silver-600 mb-3 uppercase tracking-wide">{{ fr() ? 'Changer le mot de passe (optionnel)' : 'Change password (optional)' }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Mot de passe actuel' : 'Current password' }}</label>
+              <input type="password" [ngModel]="fCurrentPwd()" (ngModelChange)="fCurrentPwd.set($event)" name="curpwd" autocomplete="current-password"
+                     class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Nouveau mot de passe' : 'New password' }}</label>
+              <input type="password" [ngModel]="fNewPwd()" (ngModelChange)="fNewPwd.set($event)" name="newpwd" autocomplete="new-password"
+                     class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+            </div>
+          </div>
+        </div>
+
+        @if (error()) {
+          <p class="text-sm text-gazety-red bg-gazety-red/5 border border-gazety-red/20 rounded-sm px-3 py-2">{{ error() }}</p>
+        }
+
+        <div class="flex items-center gap-3 pt-2">
+          <button type="submit" class="btn-primary text-sm disabled:opacity-60" [disabled]="saving()">
+            {{ saving() ? (fr() ? 'Enregistrement…' : 'Saving…') : (fr() ? 'Enregistrer' : 'Save') }}
+          </button>
+          <button type="button" (click)="cancelEdit()" class="btn-ghost text-sm">{{ fr() ? 'Annuler' : 'Cancel' }}</button>
+        </div>
+      </form>
+    }
+  </div>
+} @else {
+  <div class="container-news py-20 text-center">
+    <p class="text-silver-600 mb-4">{{ fr() ? 'Vous devez être connecté pour voir votre profil.' : 'You must be signed in to view your profile.' }}</p>
+    <a routerLink="/" class="btn-primary text-sm">{{ fr() ? "Retour à l'accueil" : 'Back home' }}</a>
+  </div>
+}

@@ -18,6 +18,18 @@ const DICTIONARY: TranslationDict = {
   'nav.opinion': { fr: 'Opinion', en: 'Opinion' },
   'nav.world': { fr: 'International', en: 'World' },
 
+  // Secteurs (colonne `sectors` de la base de données)
+  'sector.politique': { fr: 'Politique', en: 'Politics' },
+  'sector.economie': { fr: 'Économie', en: 'Economy' },
+  'sector.international': { fr: 'International', en: 'International' },
+  'sector.social': { fr: 'Social', en: 'Social' },
+  'sector.environnement': { fr: 'Environnement', en: 'Environment' },
+  'sector.agriculture': { fr: 'Agriculture', en: 'Agriculture' },
+  'sector.tourisme': { fr: 'Tourisme', en: 'Tourism' },
+  'sector.mines': { fr: 'Mines', en: 'Mining' },
+  'sector.telecoms': { fr: 'Télécoms', en: 'Telecoms' },
+  'sector.autre': { fr: 'Autre', en: 'Other' },
+
   'header.search': { fr: 'Rechercher...', en: 'Search...' },
   'header.login': { fr: 'Connexion', en: 'Sign in' },
   'header.signup': { fr: 'S\'abonner', en: 'Subscribe' },
@@ -154,15 +166,15 @@ const DICTIONARY: TranslationDict = {
   },
 
   // Auth modal
-  'auth.login.title': { fr: 'Bienvenue à Gazety', en: 'Welcome to Gazety' },
+  'auth.login.title': { fr: 'Bienvenue à Headlines', en: 'Welcome to Headlines' },
   'auth.login.subtitle': {
     fr: 'Connectez-vous pour accéder à votre compte',
     en: 'Sign in to access your account',
   },
   'auth.signup.title': { fr: 'Créer votre compte', en: 'Create your account' },
   'auth.signup.subtitle': {
-    fr: 'Rejoignez Gazety en quelques secondes',
-    en: 'Join Gazety in seconds',
+    fr: 'Rejoignez Headlines en quelques secondes',
+    en: 'Join Headlines in seconds',
   },
   'auth.email': { fr: 'Adresse email', en: 'Email address' },
   'auth.password': { fr: 'Mot de passe', en: 'Password' },
@@ -211,8 +223,8 @@ const DICTIONARY: TranslationDict = {
   'footer.cookies': { fr: 'Cookies', en: 'Cookies' },
   'footer.follow': { fr: 'Suivez-nous', en: 'Follow us' },
   'footer.copyright': {
-    fr: '© 2026 Gazety Malagasy. Tous droits réservés.',
-    en: '© 2026 Gazety Malagasy. All rights reserved.',
+    fr: '© 2026 Headlines. Tous droits réservés.',
+    en: '© 2026 Headlines. All rights reserved.',
   },
   'footer.tagline': {
     fr: 'Le premier journal en ligne 100% dédié à l\'actualité de Madagascar.',
