@@ -14,6 +14,7 @@ export interface ArticleItem {
   read_minutes?: number | null;
   image?: string | null;
   image_alt?: string | null;
+  image_position?: string | null; // cadrage object-position de la photo principale (ex. "50% 30%")
   images?: string[] | null;
   views: number;
   favorite?: boolean;

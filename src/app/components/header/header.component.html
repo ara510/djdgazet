@@ -1,97 +1,127 @@
 <header class="bg-white border-b border-silver-200 sticky top-0 z-40">
   <!-- Main header -->
   <div class="container-news py-4">
-    <div class="flex items-center justify-between gap-4">
-      <!-- Mobile menu button -->
-      <button
-        (click)="toggleMobileMenu()"
-        class="lg:hidden p-2 rounded hover:bg-silver-100"
-        aria-label="Menu"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          @if (mobileMenuOpen()) {
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          } @else {
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          }
-        </svg>
-      </button>
+    <!-- Seul le titre « Headlines » est centré en absolu (indépendant des groupes) ;
+         le logo H reste à gauche, les boutons à droite, sans bouger. -->
+    <div class="relative flex items-center justify-between gap-4 min-h-[3.5rem] md:min-h-[4.5rem]">
+      <!-- Groupe gauche : bouton menu (mobile) + logo H (inchangé) -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button
+          (click)="toggleMobileMenu()"
+          class="lg:hidden p-2 rounded hover:bg-silver-100"
+          aria-label="Menu"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            @if (mobileMenuOpen()) {
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            } @else {
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            }
+          </svg>
+        </button>
+        <a routerLink="/" class="shrink-0" aria-label="Headlines">
+          <img src="assets/haydlines-logo.png" alt="Headlines" class="w-12 h-12 object-contain" />
+        </a>
+      </div>
 
-      <!-- Logo -->
-      <a routerLink="/" class="flex items-center gap-3 group">
-        <!-- Logo -->
-        <img src="assets/haydlines-logo.png" alt="Headlines" class="w-12 h-12 object-contain" />
-        <span class="font-display font-black text-2xl md:text-3xl tracking-tight text-gazety-dark leading-none">
-          Headlines
-        </span>
+      <!-- Titre « Headlines » SEUL, centré en absolu (sans le logo) -->
+      <a routerLink="/"
+         class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display font-black text-3xl sm:text-5xl md:text-6xl tracking-wide text-gazety-dark leading-none whitespace-nowrap">
+        Headlines
       </a>
 
-      <!-- Right actions -->
-      <div class="flex items-center gap-1 md:gap-2">
-        <!-- Language toggle -->
-        <button
-          (click)="toggleLang()"
-          class="flex items-center gap-1 px-2.5 py-1.5 border border-silver-300 rounded-sm hover:border-gazety-dark transition-colors text-sm font-semibold"
-          [attr.aria-label]="i18n.isFrench() ? 'Switch to English' : 'Passer au français'"
-        >
-          <span [class.text-gazety-red]="i18n.isFrench()" [class.text-silver-400]="!i18n.isFrench()">
-            FR
-          </span>
-          <span class="text-silver-300">/</span>
-          <span [class.text-gazety-red]="!i18n.isFrench()" [class.text-silver-400]="i18n.isFrench()">
-            EN
-          </span>
-        </button>
-
+      <!-- Right actions (groupe droite, poussé à droite + léger débord dans la gouttière) -->
+      <div class="flex items-center gap-1 md:gap-2 ml-auto -mr-1 sm:-mr-2 lg:-mr-4">
         @if (auth.isLoggedIn()) {
-          <!-- Veille (dashboard) -->
-          <button
-            (click)="openVeille()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gazety-dark text-white rounded-sm text-sm font-semibold whitespace-nowrap hover:bg-gazety-dark/90 transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-            {{ i18n.isFrench() ? 'Veille' : 'Watch' }}
-          </button>
-
-          @if (auth.currentUser()?.is_admin) {
-            <!-- Gestion des articles (admin) -->
-            <a
-              routerLink="/gestion-articles"
-              routerLinkActive="bg-gazety-dark/90"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gazety-dark text-gazety-dark rounded-sm text-sm font-semibold whitespace-nowrap hover:bg-gazety-dark hover:text-white transition-colors"
+          <!-- Menu regroupant Veille / Articles / Administration / Bande d'actu (icône 3 traits) -->
+          <div class="relative">
+            <button
+              (click)="toggleActionsMenu()"
+              aria-haspopup="true"
+              [attr.aria-expanded]="actionsMenuOpen()"
+              class="inline-flex items-center gap-2 pl-2.5 pr-2 py-1.5 border border-silver-300 rounded-sm hover:border-gazety-dark hover:bg-silver-100 transition-colors"
+              [class.border-gazety-dark]="actionsMenuOpen()"
+              [class.bg-silver-100]="actionsMenuOpen()"
+              [attr.aria-label]="i18n.isFrench() ? 'Menu' : 'Menu'"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-              {{ i18n.isFrench() ? 'Articles' : 'Articles' }}
-            </a>
+              <svg class="w-5 h-5 text-gazety-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+              @if (auth.currentUser()?.avatar; as av) {
+                <img [src]="av" alt="" class="w-6 h-6 rounded-full object-cover" />
+              } @else {
+                <span class="w-6 h-6 rounded-full bg-gazety-dark text-white text-[11px] font-bold flex items-center justify-center">
+                  {{ (auth.currentUser()?.username || '?').charAt(0).toUpperCase() }}
+                </span>
+              }
+            </button>
 
-            <!-- Options / Administration (admin, hors veille) -->
-            <a
-              routerLink="/admin"
-              routerLinkActive="border-gazety-dark bg-silver-100"
-              class="inline-flex items-center justify-center w-9 h-9 border border-silver-300 text-gazety-dark rounded-sm hover:border-gazety-dark hover:bg-silver-100 transition-colors"
-              [title]="i18n.isFrench() ? 'Options d\'administration' : 'Admin options'"
-              [attr.aria-label]="i18n.isFrench() ? 'Options d\'administration' : 'Admin options'"
-            >
-              <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            </a>
-          }
+            @if (actionsMenuOpen()) {
+              <!-- Fond cliquable pour fermer le menu -->
+              <div class="fixed inset-0 z-40" (click)="closeActionsMenu()"></div>
 
-          <!-- Mon compte -->
-          <a
-            routerLink="/profil"
-            routerLinkActive="text-gazety-red"
-            class="hidden md:inline-flex items-center gap-2 px-2.5 py-1.5 rounded-sm hover:bg-silver-100 transition-colors text-sm font-semibold"
-            [title]="i18n.isFrench() ? 'Mon compte' : 'My account'"
-          >
-            @if (auth.currentUser()?.avatar; as av) {
-              <img [src]="av" alt="" class="w-6 h-6 rounded-full object-cover" />
-            } @else {
-              <span class="w-6 h-6 rounded-full bg-gazety-dark text-white text-[11px] font-bold flex items-center justify-center">
-                {{ (auth.currentUser()?.username || '?').charAt(0).toUpperCase() }}
-              </span>
+              <!-- Menu déroulant -->
+              <div class="absolute right-0 mt-2 w-64 bg-white border border-silver-200 rounded-md shadow-lg z-50 py-1.5 animate-fade-in">
+                <!-- Compte -->
+                <a routerLink="/profil" (click)="closeActionsMenu()"
+                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-silver-100 transition-colors">
+                  @if (auth.currentUser()?.avatar; as av) {
+                    <img [src]="av" alt="" class="w-9 h-9 rounded-full object-cover shrink-0" />
+                  } @else {
+                    <span class="w-9 h-9 rounded-full bg-gazety-dark text-white text-sm font-bold flex items-center justify-center shrink-0">
+                      {{ (auth.currentUser()?.username || '?').charAt(0).toUpperCase() }}
+                    </span>
+                  }
+                  <span class="flex flex-col leading-tight min-w-0">
+                    <span class="text-sm font-semibold text-gazety-dark truncate">{{ auth.currentUser()?.username }}</span>
+                    <span class="text-xs text-silver-500">{{ i18n.isFrench() ? 'Mon compte' : 'My account' }}</span>
+                  </span>
+                </a>
+
+                <div class="border-t border-silver-100 my-1"></div>
+
+                <!-- Veille -->
+                <button type="button" (click)="openVeille()"
+                        class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                  <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                  {{ i18n.isFrench() ? 'Veille' : 'Watch' }}
+                </button>
+
+                @if (auth.currentUser()?.is_admin) {
+                  <!-- Articles -->
+                  <a routerLink="/gestion-articles" (click)="closeActionsMenu()"
+                     class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    {{ i18n.isFrench() ? 'Articles' : 'Articles' }}
+                  </a>
+
+                  <!-- Administration -->
+                  <a routerLink="/admin" (click)="closeActionsMenu()"
+                     class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {{ i18n.isFrench() ? 'Administration' : 'Administration' }}
+                  </a>
+
+                  <!-- Bande d'actualités (marquee) -->
+                  <button type="button" (click)="openMarquee()"
+                          class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                    {{ i18n.isFrench() ? 'Bande d\'actualités' : 'News ticker' }}
+                    @if (marquee.enabled()) {
+                      <span class="ml-auto w-2 h-2 rounded-full bg-gazety-red" [title]="i18n.isFrench() ? 'Activée' : 'On'"></span>
+                    }
+                  </button>
+                }
+
+                <div class="border-t border-silver-100 my-1"></div>
+
+                <!-- Déconnexion -->
+                <button type="button" (click)="doLogout()"
+                        class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm font-semibold text-gazety-red hover:bg-silver-100 transition-colors">
+                  <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  {{ i18n.isFrench() ? 'Déconnexion' : 'Sign out' }}
+                </button>
+              </div>
             }
-            <span class="max-w-[8rem] truncate">{{ auth.currentUser()?.username }}</span>
-          </a>
+          </div>
         } @else {
           <!-- Login button (visible on desktop) -->
           <button
@@ -153,6 +183,14 @@
       </ul>
     </div>
   </nav>
+
+  <!-- Bande marquee « actualités & faits marquants » (1re bande, juste sous les secteurs) -->
+  <app-marquee-bar />
+
+  <!-- Panneau admin de la bande marquee (modale) -->
+  @if (marquee.adminOpen()) {
+    <app-marquee-admin />
+  }
 
   <!-- Mobile menu -->
   @if (mobileMenuOpen()) {

@@ -52,6 +52,7 @@ export class ArticleAdminComponent {
   readonly fImages = signal<string[]>([]);
   readonly fImageUrl = signal('');
   readonly fImageAlt = signal('');
+  readonly fImagePosition = signal('50% 50%'); // cadrage (object-position) de la photo principale
 
   constructor() {
     this.reload();
@@ -78,6 +79,7 @@ export class ArticleAdminComponent {
     this.fSector.set('politique'); this.fTitle.set(''); this.fDescription.set('');
     this.fAuthor.set(''); this.fAuthorRole.set(''); this.fDate.set(isoToFr(new Date().toISOString().slice(0, 10)));
     this.fCreationDate.set(''); this.fReadMinutes.set(null); this.fImages.set([]); this.fImageUrl.set(''); this.fImageAlt.set('');
+    this.fImagePosition.set('50% 50%');
     this.formOpen.set(true);
   }
 
@@ -89,10 +91,26 @@ export class ArticleAdminComponent {
     this.fReadMinutes.set(a.read_minutes ?? null);
     this.fImages.set(a.images?.length ? [...a.images] : (a.image ? [a.image] : []));
     this.fImageUrl.set(''); this.fImageAlt.set(a.image_alt ?? '');
+    this.fImagePosition.set(a.image_position || '50% 50%');
     this.formOpen.set(true);
   }
 
   cancel() { this.formOpen.set(false); }
+
+  /** Cadrage de la photo principale : point focal défini au clic/déplacement sur l'aperçu. */
+  private clampPct(n: number): number { return Math.max(0, Math.min(100, Math.round(n))); }
+  setFocal(e: MouseEvent) {
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = this.clampPct(((e.clientX - rect.left) / rect.width) * 100);
+    const y = this.clampPct(((e.clientY - rect.top) / rect.height) * 100);
+    this.fImagePosition.set(`${x}% ${y}%`);
+  }
+  onFocalDrag(e: MouseEvent) { if (e.buttons === 1) this.setFocal(e); }
+  focalX(): number { return parseInt(this.fImagePosition().split(' ')[0], 10) || 50; }
+  focalY(): number { return parseInt(this.fImagePosition().split(' ')[1], 10) || 50; }
+  setFocalPreset(pos: string) { this.fImagePosition.set(pos); }
 
   /** Upload local — plusieurs photos possibles en une fois. */
   onImageSelected(e: Event) {
@@ -144,6 +162,7 @@ export class ArticleAdminComponent {
       image: this.fImages()[0] || null,
       images: this.fImages(),
       image_alt: this.fImageAlt().trim() || null,
+      image_position: this.fImages().length ? this.fImagePosition() : null,
     };
     this.saving.set(true);
     const id = this.editingId();

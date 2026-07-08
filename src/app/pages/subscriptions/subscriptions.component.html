@@ -122,7 +122,7 @@
               <p class="text-xs text-silver-500">{{ i18n.isFrench() ? 'Sans engagement' : 'No commitment' }}</p>
             }
             @if (plan.cta === 'contact') {
-              <p class="text-xs text-silver-500">{{ i18n.isFrench() ? 'À partir de · Sur devis' : 'Starting from · Quote' }}</p>
+              <p class="text-xs text-silver-500">{{ i18n.isFrench() ? 'Tarif personnalisé selon vos besoins' : 'Custom pricing for your needs' }}</p>
             }
           </div>
 
@@ -158,23 +158,26 @@
             </ul>
 
             <!-- CTA -->
-            <button
-              class="mt-6 w-full py-3 px-4 rounded-sm font-semibold transition-colors text-sm"
-              [class.bg-gazety-dark]="plan.tier === 'silver'"
-              [class.text-white]="plan.tier === 'silver'"
-              [class.hover:bg-gazety-gray]="plan.tier === 'silver'"
-              [class.bg-gold-500]="plan.tier === 'gold'"
-              [class.hover:bg-gold-600]="plan.tier === 'gold'"
-              [class.text-gazety-dark]="plan.tier === 'gold'"
-              [class.text-white]="plan.tier === 'vip'"
-              [class.bg-gradient-to-r]="plan.tier === 'vip'"
-              [class.from-vip-600]="plan.tier === 'vip'"
-              [class.to-vip-800]="plan.tier === 'vip'"
-              [class.hover:from-vip-700]="plan.tier === 'vip'"
-              [class.hover:to-vip-900]="plan.tier === 'vip'"
-            >
-              {{ ctaLabel(plan) }}
-            </button>
+            @if (plan.cta === 'contact') {
+              <a
+                routerLink="/contact"
+                class="mt-6 w-full py-3 px-4 rounded-sm font-semibold transition-colors text-sm text-center block text-white bg-gradient-to-r from-vip-600 to-vip-800 hover:from-vip-700 hover:to-vip-900"
+              >
+                {{ ctaLabel(plan) }}
+              </a>
+            } @else {
+              <button
+                class="mt-6 w-full py-3 px-4 rounded-sm font-semibold transition-colors text-sm"
+                [class.bg-gazety-dark]="plan.tier === 'silver'"
+                [class.text-white]="plan.tier === 'silver'"
+                [class.hover:bg-gazety-gray]="plan.tier === 'silver'"
+                [class.bg-gold-500]="plan.tier === 'gold'"
+                [class.hover:bg-gold-600]="plan.tier === 'gold'"
+                [class.text-gazety-dark]="plan.tier === 'gold'"
+              >
+                {{ ctaLabel(plan) }}
+              </button>
+            }
           </div>
         </article>
       }
@@ -231,8 +234,8 @@
           </summary>
           <p class="mt-3 text-sm text-silver-600 leading-relaxed">
             {{ i18n.isFrench()
-              ? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vous pouvez passer d\'un abonnement à un autre à tout moment depuis votre espace personnel. Le changement est effectif immédiatement.'
-              : 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. You can switch between plans at any time from your account. The change is effective immediately.' }}
+              ? 'Vous pouvez passer d\'un abonnement à un autre à tout moment depuis votre espace personnel. Le changement est effectif immédiatement.'
+              : 'You can switch between plans at any time from your account. The change is effective immediately.' }}
           </p>
         </details>
         <details class="bg-white p-5 rounded-sm border border-silver-200 group">
@@ -242,30 +245,19 @@
           </summary>
           <p class="mt-3 text-sm text-silver-600 leading-relaxed">
             {{ i18n.isFrench()
-              ? 'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Nous acceptons les cartes bancaires, Mvola, Orange Money et virement bancaire pour les abonnements entreprises.'
-              : 'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. We accept credit cards, Mvola, Orange Money and bank transfers for enterprise subscriptions.' }}
+              ? 'Nous acceptons les paiements par mobile money : Mvola, Orange Money et Airtel Money. Le paiement par carte bancaire sera disponible prochainement.'
+              : 'We accept mobile money payments: Mvola, Orange Money and Airtel Money. Credit card payment will be available soon.' }}
           </p>
         </details>
         <details class="bg-white p-5 rounded-sm border border-silver-200 group">
           <summary class="font-semibold cursor-pointer text-gazety-dark flex items-center justify-between">
-            <span>{{ i18n.isFrench() ? 'L\'abonnement Veille Dédiée inclut-il des comptes équipe ?' : 'Does the Dedicated Watch include team accounts?' }}</span>
+            <span>{{ i18n.isFrench() ? 'Que comprend l\'abonnement Veille Dédiée ?' : 'What does the Dedicated Watch include?' }}</span>
             <svg class="w-5 h-5 text-silver-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
           </summary>
           <p class="mt-3 text-sm text-silver-600 leading-relaxed">
             {{ i18n.isFrench()
-              ? 'Ut enim ad minim veniam, quis nostrud exercitation. La formule Dédiée inclut jusqu\'à 10 utilisateurs et un analyste dédié pour répondre à vos demandes spécifiques.'
-              : 'Ut enim ad minim veniam, quis nostrud exercitation. The Dedicated plan includes up to 10 users and a dedicated analyst to answer your specific requests.' }}
-          </p>
-        </details>
-        <details class="bg-white p-5 rounded-sm border border-silver-200 group">
-          <summary class="font-semibold cursor-pointer text-gazety-dark flex items-center justify-between">
-            <span>{{ i18n.isFrench() ? 'Proposez-vous des tarifs étudiants ?' : 'Do you offer student pricing?' }}</span>
-            <svg class="w-5 h-5 text-silver-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-          </summary>
-          <p class="mt-3 text-sm text-silver-600 leading-relaxed">
-            {{ i18n.isFrench()
-              ? 'Duis aute irure dolor in reprehenderit. Oui, les étudiants bénéficient de -50% sur l\'abonnement Veille Sectorielle sur présentation d\'un justificatif.'
-              : 'Duis aute irure dolor in reprehenderit. Yes, students get -50% off the Sectorial Watch plan on proof of enrollment.' }}
+              ? 'La Veille Dédiée comprend l\'accès à toutes les veilles, des veilles personnalisées réalisées à la demande et l\'option alerte mail en temps réel. Le tarif est établi sur devis : contactez-nous via le formulaire de contact pour discuter de vos besoins.'
+              : 'The Dedicated Watch includes access to all watches, custom watches on demand and the real-time email alert option. Pricing is quote-based: contact us through the contact form to discuss your needs.' }}
           </p>
         </details>
       </div>
@@ -288,7 +280,7 @@
       <a routerLink="/" class="btn-outline px-6 py-3">
         {{ i18n.isFrench() ? 'Retour à l\'accueil' : 'Back to home' }}
       </a>
-      <a href="#" class="btn-primary px-6 py-3">
+      <a routerLink="/contact" class="btn-primary px-6 py-3">
         {{ i18n.isFrench() ? 'Parler à un conseiller' : 'Talk to a consultant' }}
       </a>
     </div>

@@ -89,6 +89,14 @@
                       {{ u.disabled ? (fr ? 'Réactiver' : 'Enable') : (fr ? 'Désactiver' : 'Disable') }}
                     </button>
                   }
+                  <button class="ucard__act ucard__act--msg" type="button" (click)="messageUser(u)">
+                    {{ fr ? 'Message' : 'Message' }}
+                  </button>
+                  @if (u.id !== auth.currentUser()?.id) {
+                    <button class="ucard__act ucard__act--del" type="button" (click)="deleteUser(u)">
+                      {{ fr ? 'Supprimer' : 'Delete' }}
+                    </button>
+                  }
                 </div>
               </footer>
             </article>

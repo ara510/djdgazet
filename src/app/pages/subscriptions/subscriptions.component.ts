@@ -45,17 +45,9 @@ export class SubscriptionsComponent {
       cta: 'free',
       features: [
         { key: 'feat.basic_news', included: true, highlighted: true },
-        { key: 'feat.daily_newsletter', included: true },
-        { key: 'feat.basic_search', included: true },
-        { key: 'feat.limited_articles', included: true },
-        { key: 'feat.all_articles', included: false },
-        { key: 'feat.sector_reports', included: false },
-        { key: 'feat.exclusive_analysis', included: false },
-        { key: 'feat.full_archives', included: false },
-        { key: 'feat.priority_support', included: false },
-        { key: 'feat.custom_reports', included: false },
-        { key: 'feat.dedicated_analyst', included: false },
-        { key: 'feat.api_access', included: false },
+        { key: 'feat.all_veilles', included: false },
+        { key: 'feat.custom_veilles', included: false },
+        { key: 'feat.realtime_alerts', included: false },
       ],
     },
     {
@@ -69,17 +61,9 @@ export class SubscriptionsComponent {
       popular: true,
       features: [
         { key: 'feat.basic_news', included: true },
-        { key: 'feat.daily_newsletter', included: true },
-        { key: 'feat.basic_search', included: true },
-        { key: 'feat.all_articles', included: true, highlighted: true },
-        { key: 'feat.sector_reports', included: true, highlighted: true },
-        { key: 'feat.exclusive_analysis', included: true },
-        { key: 'feat.full_archives', included: true },
-        { key: 'feat.briefings', included: true },
-        { key: 'feat.priority_support', included: true },
-        { key: 'feat.custom_reports', included: false },
-        { key: 'feat.dedicated_analyst', included: false },
-        { key: 'feat.api_access', included: false },
+        { key: 'feat.all_veilles', included: true, highlighted: true },
+        { key: 'feat.custom_veilles', included: false },
+        { key: 'feat.realtime_alerts', included: false },
       ],
     },
     {
@@ -87,25 +71,15 @@ export class SubscriptionsComponent {
       tier: 'vip',
       nameKey: 'sub.dedicated.name',
       taglineKey: 'sub.dedicated.tagline',
-      monthly: 249,
-      yearly: 2390,
+      monthly: 0,
+      yearly: 0,
       cta: 'contact',
       recommended: true,
       features: [
         { key: 'feat.basic_news', included: true },
-        { key: 'feat.daily_newsletter', included: true },
-        { key: 'feat.basic_search', included: true },
-        { key: 'feat.all_articles', included: true },
-        { key: 'feat.sector_reports', included: true },
-        { key: 'feat.exclusive_analysis', included: true },
-        { key: 'feat.full_archives', included: true },
-        { key: 'feat.briefings', included: true },
-        { key: 'feat.priority_support', included: true },
-        { key: 'feat.custom_reports', included: true, highlighted: true },
-        { key: 'feat.dedicated_analyst', included: true, highlighted: true },
-        { key: 'feat.api_access', included: true },
-        { key: 'feat.team_accounts', included: true },
-        { key: 'feat.events_access', included: true },
+        { key: 'feat.all_veilles', included: true, highlighted: true },
+        { key: 'feat.custom_veilles', included: true, highlighted: true },
+        { key: 'feat.realtime_alerts', included: true, highlighted: true },
       ],
     },
   ];
@@ -116,12 +90,13 @@ export class SubscriptionsComponent {
 
   formatPrice(plan: Plan): string {
     if (plan.cta === 'free') return this.i18n.t('sub.free');
+    if (plan.cta === 'contact') return this.i18n.isFrench() ? 'Sur devis' : 'On quote';
     const value = this.isMonthly() ? plan.monthly : plan.yearly;
     return `€${value}`;
   }
 
   priceUnit(plan: Plan): string {
-    if (plan.cta === 'free') return '';
+    if (plan.cta === 'free' || plan.cta === 'contact') return '';
     return this.isMonthly() ? this.i18n.t('sub.month') : this.i18n.t('sub.year');
   }
 
@@ -132,7 +107,7 @@ export class SubscriptionsComponent {
   }
 
   yearlyEquivalent(plan: Plan): string {
-    if (plan.cta === 'free' || !this.isMonthly()) return '';
+    if (plan.cta !== 'paid' || !this.isMonthly()) return '';
     const monthly = (plan.yearly / 12).toFixed(0);
     return this.i18n.isFrench()
       ? `Soit €${monthly}/mois facturé annuellement`

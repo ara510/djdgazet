@@ -411,6 +411,12 @@
                     </span>
                   }
                   {{ cardHeading(item) }}
+                  @for (sec of sectorsOf(item); track sec) {
+                    <span class="dash-card__sector-chip"
+                          [style.color]="sectorColor(sec)"
+                          [style.borderColor]="sectorColor(sec)"
+                          [style.background]="sectorTint(sec)">{{ sectorLabel(sec) }}</span>
+                  }
                 </h3>
                 @if (item.author) { <p class="dash-card__author">{{ fr ? 'Par' : 'By' }} {{ item.author }}</p> }
                 @if (item.excerpt) { <p class="dash-card__excerpt recap__fact-text" [innerHTML]="formatRecapText(item.excerpt)"></p> }
@@ -431,7 +437,6 @@
                       </span>
                     }
                   }
-                  @for (sec of sectorsOf(item); track sec) { <span class="dash-card__sector">{{ sectorLabel(sec) }}</span> }
                   @for (tg of tagsOf(item); track tg) { <span class="dash-card__tag">{{ tagLabel(tg) }}</span> }
                   @if (item.tone && canSeeTone) { <span class="dash-tone-chip" [attr.data-tone]="item.tone" [attr.title]="toneLabel(item.tone)"><span class="dash-tone__dot"></span>{{ toneLabel(item.tone) }}</span> }
                   @if (item.has_video) {

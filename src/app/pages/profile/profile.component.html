@@ -77,6 +77,33 @@
         </div>
       </div>
 
+      <!-- Suivi du quota découverte (plan Générale) : lectures utilisées + date de réinitialisation -->
+      @if (quota()?.applicable) {
+        <div class="mt-6 border border-silver-200 rounded-sm p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gazety-dark">{{ fr() ? 'Accès découverte — quota de lectures' : 'Discovery access — read quota' }}</p>
+            <span class="text-sm font-bold text-gazety-dark">{{ quota()!.used }} / {{ quota()!.limit }}</span>
+          </div>
+          <div class="h-2 rounded-full bg-silver-100 overflow-hidden mb-2">
+            <div class="h-full bg-gazety-red transition-all" [style.width.%]="((quota()!.used || 0) / (quota()!.limit || 1)) * 100"></div>
+          </div>
+          <p class="text-xs text-silver-600">
+            {{ fr()
+              ? (quota()!.remaining + ' lecture(s) restante(s) sur ' + quota()!.limit + ', renouvelées tous les ' + quota()!.windowDays + ' jours (politique, économie, social).')
+              : (quota()!.remaining + ' read(s) left of ' + quota()!.limit + ', renewed every ' + quota()!.windowDays + ' days (politics, economy, social).') }}
+          </p>
+          @if (quota()!.resetAt) {
+            <p class="text-xs text-silver-500 mt-1">
+              {{ fr() ? 'Réinitialisation le ' : 'Resets on ' }}<strong class="text-gazety-dark font-semibold">{{ formatDate(quota()!.resetAt) }}</strong>
+            </p>
+          } @else {
+            <p class="text-xs text-silver-500 mt-1">
+              {{ fr() ? 'La fenêtre démarrera à votre première lecture.' : 'The window starts on your first read.' }}
+            </p>
+          }
+        </div>
+      }
+
       @if (!u.email_verified) {
         <div class="mt-6 border border-amber-200 bg-amber-50/60 rounded-sm p-5">
           <p class="text-sm font-semibold text-amber-800 mb-1">{{ fr() ? 'Vérifiez votre adresse email' : 'Verify your email address' }}</p>

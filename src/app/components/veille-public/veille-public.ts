@@ -1,6 +1,7 @@
 import { Component, inject, signal, output, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { TranslationService } from '../../services/translation.service';
 import { AuthService } from '../../services/auth.service';
 import { VeilleItem } from '../../services/veille.service';
@@ -23,13 +24,13 @@ interface PublicVeille extends VeilleItem {
 })
 export class VeillePublicComponent implements OnInit {
   private http = inject(HttpClient);
+  private router = inject(Router);
   lang = inject(TranslationService);
   auth = inject(AuthService);
 
   /** Demande l'ouverture de la modale de connexion/inscription. */
   openAuth = output<void>();
 
-  readonly LIMIT = 5;
   readonly STORE = 'hd_public_reads';
 
   items    = signal<PublicVeille[]>([]);
@@ -82,7 +83,11 @@ export class VeillePublicComponent implements OnInit {
   private reads(): number[] {
     try { return JSON.parse(localStorage.getItem(this.STORE) || '[]'); } catch { return []; }
   }
-  get remaining(): number { return Math.max(0, this.LIMIT - this.reads().length); }
+  /** Veilles librement lisibles (Générale, non verrouillées) réellement disponibles. */
+  get freeItems(): PublicVeille[] { return this.items().filter(i => !i.locked); }
+  /** Limite = nombre de veilles gratuites réellement publiées (plus de valeur figée « 5 »). */
+  get freeLimit(): number { return this.freeItems.length; }
+  get remaining(): number { return Math.max(0, this.freeLimit - this.reads().length); }
 
   openItem(item: PublicVeille) {
     // Veilles payantes (Sectorielle / Dédiée) : verrou immédiat → payer ou créer un compte.
@@ -90,7 +95,7 @@ export class VeillePublicComponent implements OnInit {
     if (this.isLogged) { this.selected.set(item); return; }       // connecté : pas de limite ici
     const r = this.reads();
     if (r.includes(item.id)) { this.selected.set(item); return; } // déjà lue → ne recompte pas
-    if (r.length >= this.LIMIT) { this.gateMode.set('reads'); this.showGate.set(true); return; } // 6e générale → créer un compte
+    if (r.length >= this.freeLimit) { this.gateMode.set('reads'); this.showGate.set(true); return; } // toutes lues → créer un compte
     r.push(item.id);
     localStorage.setItem(this.STORE, JSON.stringify(r));
     this.selected.set(item);
@@ -100,9 +105,9 @@ export class VeillePublicComponent implements OnInit {
 
   goSignup() { this.showGate.set(false); this.selected.set(null); this.openAuth.emit(); }
 
-  /** Renvoie vers la section des offres (abonnement). */
+  /** Renvoie vers la page des abonnements. */
   goOffers() {
     this.showGate.set(false); this.selected.set(null);
-    document.getElementById('offres')?.scrollIntoView({ behavior: 'smooth' });
+    this.router.navigate(['/abonnements']);
   }
 }

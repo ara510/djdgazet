@@ -55,4 +55,29 @@ export class ToastService {
       customClass: { popup: 'hd-swal' },
     }).then(r => r.isConfirmed);
   }
+
+  /** Saisie de texte (SweetAlert2). Résout le texte saisi, ou `null` si annulé. */
+  prompt(opts: {
+    title: string;
+    text?: string;
+    placeholder?: string;
+    confirmText?: string;
+    inputType?: 'text' | 'textarea';
+  }): Promise<string | null> {
+    const fr = this.lang.lang() === 'fr';
+    return Swal.fire({
+      title: opts.title,
+      text: opts.text,
+      input: opts.inputType ?? 'textarea',
+      inputPlaceholder: opts.placeholder,
+      showCancelButton: true,
+      reverseButtons: true,
+      confirmButtonText: opts.confirmText ?? (fr ? 'Envoyer' : 'Send'),
+      cancelButtonText: fr ? 'Annuler' : 'Cancel',
+      confirmButtonColor: '#1e5fd4',
+      cancelButtonColor: '#9A8E7E',
+      customClass: { popup: 'hd-swal' },
+      inputValidator: (v: string) => (!v || !v.trim()) ? (fr ? 'Message vide.' : 'Empty message.') : null,
+    }).then(r => (r.isConfirmed ? (r.value as string) : null));
+  }
 }

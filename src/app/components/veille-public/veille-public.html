@@ -13,11 +13,11 @@
     } @else if (items().length === 0) {
       <p class="vp__state">{{ fr ? 'Aucune veille publiée pour le moment.' : 'No published watch items yet.' }}</p>
     } @else {
-      @if (!isLogged) {
+      @if (!isLogged && freeLimit > 0) {
         <p class="vp__quota">
           @if (remaining > 0) {
             {{ fr ? 'Lecture libre : ' : 'Free reads: ' }}<strong>{{ remaining }}</strong>
-            {{ fr ? 'veille(s) restante(s)' : 'left' }}
+            {{ fr ? (remaining > 1 ? ' veilles restantes' : ' veille restante') : (remaining > 1 ? ' left' : ' left') }}
           } @else {
             {{ fr ? 'Limite de lecture atteinte — créez un compte pour continuer.' : 'Read limit reached — create an account to continue.' }}
           }
@@ -144,8 +144,8 @@
         <h3 class="vp-gate__title">{{ fr ? 'Continuez gratuitement' : 'Continue for free' }}</h3>
         <p class="vp-gate__desc">
           {{ fr
-            ? 'Vous avez lu vos 5 veilles gratuites. Créez un compte gratuit pour accéder à toute la Veille Générale.'
-            : 'You have read your 5 free items. Create a free account to access all the General Watch.' }}
+            ? ('Vous avez lu ' + (freeLimit > 1 ? 'les ' + freeLimit + ' veilles gratuites' : 'la veille gratuite') + '. Créez un compte gratuit pour accéder à toute la Veille Générale.')
+            : ('You have read ' + (freeLimit > 1 ? 'all ' + freeLimit + ' free items' : 'the free item') + '. Create a free account to access all the General Watch.') }}
         </p>
         <div class="vp-gate__actions">
           <button class="vp-gate__btn vp-gate__btn--ghost" type="button" (click)="showGate.set(false)">{{ fr ? 'Plus tard' : 'Later' }}</button>

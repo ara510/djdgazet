@@ -1,11 +1,24 @@
 import { Component, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { I18nService } from '../../services/i18n.service';
 import { ToastService } from '../../services/toast.service';
 import { isoToFr, frToIso } from '../../utils/date-fr';
+
+/** État du quota découverte (plan Générale) renvoyé par GET /api/veille/quota. */
+interface QuotaInfo {
+  applicable: boolean;
+  plan: string;
+  sectors?: string[];
+  windowDays?: number;
+  used?: number;
+  limit?: number;
+  remaining?: number;
+  resetAt?: string | null;
+}
 
 @Component({
   selector: 'app-profile',
@@ -18,8 +31,25 @@ export class ProfileComponent {
   protected readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
 
   readonly fr = computed(() => this.i18n.isFrench());
+
+  // ── Quota découverte (plan Générale) ──────────────────────────────────
+  readonly quota = signal<QuotaInfo | null>(null);
+
+  constructor() {
+    this.loadQuota();
+  }
+
+  private loadQuota() {
+    const t = this.auth.token();
+    if (!t) return;
+    this.http.get<QuotaInfo>('/api/veille/quota', { headers: { Authorization: `Bearer ${t}` } }).subscribe({
+      next: q => this.quota.set(q),
+      error: () => this.quota.set(null),
+    });
+  }
 
   readonly editing = signal(false);
   readonly saving = signal(false);

@@ -253,6 +253,24 @@
   &--on { color: #1e8449; border-color: rgba(39,174,96,0.4); &:hover { color: #1e8449; border-color: #1e8449; } }
 }
 
+// Actions par compte : envoyer un message / supprimer
+.ucard__act {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  &--msg:hover { color: var(--color-accent); border-color: var(--color-accent); }
+  &--del { color: #c0392b; border-color: rgba(192,57,43,0.4); }
+  &--del:hover { color: #fff; background: #c0392b; border-color: #c0392b; }
+}
+
 @media (max-width: 560px) {
   .user-cards { grid-template-columns: 1fr; max-height: none; overflow: visible; }
   .ucard__badges { max-width: none; }

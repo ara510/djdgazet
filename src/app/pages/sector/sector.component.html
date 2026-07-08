@@ -7,8 +7,38 @@
     <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark">{{ sectorLabel() }}</h1>
   </div>
 
-  <!-- Bandeau gating -->
-  @if (hasLocked()) {
+  <!-- Bandeau accès découverte (plan Générale : 6 lectures / 10 jours sur ce secteur) -->
+  @if (quota(); as q) {
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center gap-3 rounded-sm px-5 py-4 border"
+         [class.bg-gold-50]="q.remaining > 0" [class.border-gold-200]="q.remaining > 0"
+         [class.bg-silver-50]="q.remaining === 0" [class.border-silver-300]="q.remaining === 0">
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-gazety-dark">
+          @if (q.remaining > 0) {
+            {{ i18n.isFrench()
+              ? 'Accès découverte : ' + q.remaining + ' lecture' + (q.remaining > 1 ? 's' : '') + ' gratuite' + (q.remaining > 1 ? 's' : '') + ' restante' + (q.remaining > 1 ? 's' : '') + ' sur ' + q.limit
+              : 'Discovery access: ' + q.remaining + ' free read' + (q.remaining > 1 ? 's' : '') + ' left out of ' + q.limit }}
+          } @else {
+            {{ i18n.isFrench() ? 'Votre quota découverte est épuisé' : 'Your discovery quota is used up' }}
+          }
+        </p>
+        <p class="text-xs text-silver-600 mt-0.5">
+          {{ i18n.isFrench()
+            ? 'Votre abonnement Générale offre ' + q.limit + ' lectures tous les 10 jours sur les secteurs politique, économie et social.'
+            : 'Your General plan includes ' + q.limit + ' reads every 10 days across the politics, economy and social sectors.' }}
+          @if (q.resetAt) {
+            {{ i18n.isFrench() ? 'Compteur remis à zéro le ' + quotaResetLabel() + '.' : 'Counter resets on ' + quotaResetLabel() + '.' }}
+          }
+        </p>
+      </div>
+      <a routerLink="/abonnements" class="btn-primary text-sm whitespace-nowrap">
+        {{ i18n.isFrench() ? 'Passer à un abonnement' : 'Upgrade' }}
+      </a>
+    </div>
+  }
+
+  <!-- Bandeau gating (masqué quand le bandeau découverte est affiché) -->
+  @if (hasLocked() && !quota()) {
     <div class="mb-8 flex flex-col sm:flex-row sm:items-center gap-3 bg-gold-50 border border-gold-200 rounded-sm px-5 py-4">
       <div class="flex-1">
         <p class="text-sm font-semibold text-gazety-dark">

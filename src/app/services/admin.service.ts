@@ -200,4 +200,24 @@ export class AdminService {
       `/api/users/${id}/admin`, { is_admin }, { headers: this.headers() }
     );
   }
+
+  /** Supprime définitivement un compte de la base. */
+  deleteUser(id: number) {
+    return this.http.delete<{ ok: boolean; id: number }>(
+      `/api/users/${id}`, { headers: this.headers() }
+    );
+  }
+
+  /** Retire un compte supprimé de la liste locale et met à jour le total. */
+  removeUserLocal(id: number) {
+    this.users.update(list => list.filter(u => u.id !== id));
+    this.usersTotal.update(t => Math.max(0, t - 1));
+  }
+
+  /** Envoie un message au compte via le chat support (message « staff »). */
+  messageUser(id: number, body: string) {
+    return this.http.post<{ ok: boolean }>(
+      `/api/users/${id}/message`, { body }, { headers: this.headers() }
+    );
+  }
 }

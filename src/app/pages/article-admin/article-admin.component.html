@@ -112,6 +112,34 @@
           </div>
         </div>
 
+        <!-- Cadrage de la photo principale (point focal) — utile quand les résolutions varient -->
+        @if (fImages().length) {
+          <div>
+            <label class="block text-xs font-semibold text-gazety-dark mb-1.5">
+              {{ fr() ? 'Cadrage de la photo principale' : 'Cover photo framing' }}
+              <span class="text-silver-500 font-normal">· {{ fr() ? 'cliquez ou glissez pour choisir le point visible' : 'click or drag to set the visible point' }}</span>
+            </label>
+            <div
+              class="relative w-full max-h-[18rem] aspect-[16/9] rounded-sm overflow-hidden border border-silver-300 cursor-crosshair select-none"
+              (click)="setFocal($event)"
+              (mousemove)="onFocalDrag($event)"
+            >
+              <img [src]="fImages()[0]" alt="" class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                   [style.object-position]="fImagePosition()" />
+              <!-- Repère du point focal -->
+              <span class="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-gazety-red/70 shadow pointer-events-none"
+                    [style.left.%]="focalX()" [style.top.%]="focalY()"></span>
+            </div>
+            <div class="flex items-center gap-2 mt-2 flex-wrap text-xs">
+              <span class="text-silver-500">{{ fr() ? 'Rapide :' : 'Quick:' }}</span>
+              <button type="button" (click)="setFocalPreset('50% 0%')"   class="px-2 py-1 border border-silver-300 rounded-sm hover:border-gazety-dark">{{ fr() ? 'Haut' : 'Top' }}</button>
+              <button type="button" (click)="setFocalPreset('50% 50%')"  class="px-2 py-1 border border-silver-300 rounded-sm hover:border-gazety-dark">{{ fr() ? 'Centre' : 'Center' }}</button>
+              <button type="button" (click)="setFocalPreset('50% 100%')" class="px-2 py-1 border border-silver-300 rounded-sm hover:border-gazety-dark">{{ fr() ? 'Bas' : 'Bottom' }}</button>
+              <span class="text-silver-400 ml-auto">{{ fImagePosition() }}</span>
+            </div>
+          </div>
+        }
+
         <div>
           <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Description de la photo' : 'Photo description' }}</label>
           <input type="text" [ngModel]="fImageAlt()" (ngModelChange)="fImageAlt.set($event)" name="imageAlt"

@@ -587,6 +587,24 @@
     .dash-card__unread-dot, .dash-card__pin { display: inline-block; vertical-align: middle; margin-right: 0.3rem; }
   }
 
+  // Pastille secteur colorée, affichée juste à côté du titre (une couleur par secteur).
+  // Couleur / bord / fond fournis en style inline (voir sectorColor/sectorTint).
+  &__sector-chip {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 0.45rem;
+    font-family: var(--font-body);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    line-height: 1;
+    border: 1px solid;
+    border-radius: 20px;
+    padding: 0.18rem 0.5rem;
+    white-space: nowrap;
+  }
+
   // Signal d'alerte : veille (bulletin) contenant des « Signaux d'alerte ».
   // Agrandi + battement de cœur toutes les 3 s pour rester bien visible.
   &__signal {

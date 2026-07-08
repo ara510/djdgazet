@@ -1,25 +1,54 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, HostListener, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
 import { VeilleService } from '../../services/veille.service';
+import { MarqueeService } from '../../services/marquee.service';
+import { MarqueeBarComponent } from '../marquee-bar/marquee-bar.component';
+import { MarqueeAdminComponent } from '../marquee-admin/marquee-admin.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterLink, RouterLinkActive, MarqueeBarComponent, MarqueeAdminComponent],
   templateUrl: './header.component.html',
 })
 export class HeaderComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthService);
   protected readonly veille = inject(VeilleService);
+  protected readonly marquee = inject(MarqueeService);
+  private readonly router = inject(Router);
 
   @Output() openAuth = new EventEmitter<'login' | 'signup'>();
 
+  constructor() {
+    this.marquee.load(); // charge l'état public de la bande (affichée si activée)
+  }
+
+  // ── Menu d'actions (Veille / Articles / Administration / Bande d'actu) ──
+  readonly actionsMenuOpen = signal(false);
+  toggleActionsMenu() { this.actionsMenuOpen.update((v) => !v); }
+  closeActionsMenu() { this.actionsMenuOpen.set(false); }
+
+  @HostListener('document:keydown.escape')
+  onEscape() { this.actionsMenuOpen.set(false); }
+
   openVeille() {
+    this.closeActionsMenu();
     this.veille.open();
+  }
+
+  openMarquee() {
+    this.closeActionsMenu();
+    this.marquee.openAdmin();
+  }
+
+  doLogout() {
+    this.closeActionsMenu();
+    this.auth.logout();
+    this.router.navigate(['/']);
   }
 
   readonly mobileMenuOpen = signal(false);
@@ -40,9 +69,5 @@ export class HeaderComponent {
 
   toggleMobileMenu() {
     this.mobileMenuOpen.update((v) => !v);
-  }
-
-  toggleLang() {
-    this.i18n.toggle();
   }
 }

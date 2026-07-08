@@ -72,6 +72,35 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(express.json({ limit: '10mb' })); // les médias passent par /api/upload (multipart), plus en base64
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '30d' }));
 
+// Table de base : users doit exister avant les migrations et les FK ci-dessous.
+// (Sur une base vierge, certaines requêtes suivantes peuvent échouer au premier
+// démarrage le temps que users soit créée — tout est idempotent, un redémarrage
+// suffit à converger.)
+db.query(`
+  CREATE TABLE IF NOT EXISTS users (
+    id             SERIAL PRIMARY KEY,
+    nom            TEXT NOT NULL,
+    prenoms        TEXT,
+    date_naissance DATE,
+    email          TEXT NOT NULL UNIQUE,
+    username       TEXT NOT NULL UNIQUE,
+    password_hash  TEXT NOT NULL,
+    avatar         TEXT,
+    telephone      VARCHAR(30),
+    pays           VARCHAR(100),
+    ville          VARCHAR(100),
+    genre          VARCHAR(30),
+    terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    notif_email    BOOLEAN NOT NULL DEFAULT TRUE,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    plan           VARCHAR(20) NOT NULL DEFAULT 'generale',
+    is_admin       BOOLEAN NOT NULL DEFAULT FALSE,
+    disabled       BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at     TIMESTAMPTZ
+  )
+`).catch(err => console.error('Init table users:', err.message));
+
 // Auto-migration
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`).catch(() => {});
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => {});
@@ -154,6 +183,14 @@ db.query(`
     favorite   BOOLEAN NOT NULL DEFAULT FALSE,
     is_read    BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, veille_id)
+  )
+`).catch(() => {});
+db.query(`
+  CREATE TABLE IF NOT EXISTS veille_quota_reads (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    veille_id  INTEGER NOT NULL REFERENCES veille_items(id) ON DELETE CASCADE,
+    read_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, veille_id)
   )
 `).catch(() => {});
@@ -271,6 +308,7 @@ db.query(`
 db.query(`CREATE INDEX IF NOT EXISTS idx_articles_sector ON articles(sector)`).catch(() => {});
 db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS creation_date DATE`).catch(() => {}); // date de rédaction (≠ date d'ajout/publication)
 db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS images TEXT[]`).catch(() => {});      // photos de l'article (la 1re = photo principale)
+db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS image_position VARCHAR(20)`).catch(() => {}); // cadrage de la photo principale (object-position, ex. "50% 30%")
 // Favoris d'articles (enregistrés par les utilisateurs).
 db.query(`
   CREATE TABLE IF NOT EXISTS article_favorites (
@@ -278,6 +316,15 @@ db.query(`
     article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (user_id, article_id)
+  )
+`).catch(() => {});
+
+// Réglages du site (clé/valeur) — ex. bande marquee « actualités & faits marquants ».
+db.query(`
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      JSONB,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
   )
 `).catch(() => {});
 
@@ -512,8 +559,11 @@ const APP_URL = process.env.APP_URL || 'http://localhost:4200';
 const BRAND_NAME    = process.env.BRAND_NAME    || 'Dujardin Delacour & Cie';
 const BRAND_TAGLINE = process.env.BRAND_TAGLINE || 'Antananarivo, Madagascar';
 const BRAND_LOGO    = process.env.BRAND_LOGO    || `${APP_URL}/assets/DJD2.png`;
-const SENDER_EMAIL  = process.env.SENDER_EMAIL  || SENDER_EMAIL;
-const CONTACT_EMAIL = process.env.CONTACT_EMAIL || CONTACT_EMAIL;
+const SENDER_EMAIL  = process.env.SENDER_EMAIL  || 'noreply@dujardin-delacour.com';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'contact@dujardin-delacour.com';
+// Expéditeur affiché « Headlines <noreply@…> » : plus lisible en boîte de réception et
+// meilleur signal anti-spam qu'une adresse nue.
+const SENDER_FROM   = SENDER_EMAIL.includes('<') ? SENDER_EMAIL : `${BRAND_NAME} <${SENDER_EMAIL}>`;
 
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -521,13 +571,13 @@ function generateOtp() {
 
 function emailLayout(content) {
   return `
-  <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#EFECE5;border-radius:6px;overflow:hidden;">
+  <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#EAF1FB;border-radius:6px;overflow:hidden;">
     <div style="padding:28px 40px;text-align:center;">
       <img src="${BRAND_LOGO}" alt="${BRAND_NAME}" width="140" style="display:block;margin:0 auto;max-width:140px;" />
     </div>
     <div style="background:#fff;padding:36px 40px;">${content}</div>
     <div style="padding:16px 40px 24px;text-align:center;">
-      <p style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#9A8E7E;margin:0;">
+      <p style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#6C7A93;margin:0;">
         ${BRAND_NAME} — ${BRAND_TAGLINE}
       </p>
     </div>
@@ -549,20 +599,20 @@ app.post('/api/auth/send-otp', requireAuth, async (req, res) => {
 
     try {
       await resend.emails.send({
-        from:    SENDER_EMAIL,
+        from:    SENDER_FROM,
         to:      rows[0].email,
         subject: `Votre code de vérification — ${BRAND_NAME}`,
         html: emailLayout(`
-          <h2 style="font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 8px;">Vérification de votre adresse e-mail</h2>
-          <p style="font-size:0.85rem;color:#6B6560;margin:0 0 28px;line-height:1.6;">
+          <h2 style="font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 8px;">Vérification de votre adresse e-mail</h2>
+          <p style="font-size:0.85rem;color:#3A4A63;margin:0 0 28px;line-height:1.6;">
             Entrez le code ci-dessous dans l'application. Il expire dans <strong>15 minutes</strong>.
           </p>
           <div style="text-align:center;margin:0 0 28px;">
-            <span style="font-size:2.5rem;letter-spacing:0.4em;font-weight:700;color:#1A1916;font-family:monospace;">
+            <span style="font-size:2.5rem;letter-spacing:0.4em;font-weight:700;color:#1C2637;font-family:monospace;">
               ${code}
             </span>
           </div>
-          <p style="font-size:0.75rem;color:#9A8E7E;margin:0;">
+          <p style="font-size:0.75rem;color:#6C7A93;margin:0;">
             Si vous n'avez pas demandé ce code, ignorez cet e-mail.
           </p>
         `),
@@ -622,21 +672,21 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const resetUrl   = `${APP_URL}?reset=${resetToken}`;
 
     await resend.emails.send({
-      from:    SENDER_EMAIL,
+      from:    SENDER_FROM,
       to:      email,
       subject: `Réinitialisation de mot de passe — ${BRAND_NAME}`,
       html: emailLayout(`
-        <h2 style="font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 8px;">Réinitialisation de mot de passe</h2>
-        <p style="font-size:0.85rem;color:#6B6560;margin:0 0 28px;line-height:1.6;">
+        <h2 style="font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 8px;">Réinitialisation de mot de passe</h2>
+        <p style="font-size:0.85rem;color:#3A4A63;margin:0 0 28px;line-height:1.6;">
           Bonjour ${rows[0].nom},<br/>
           Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe. Ce lien expire dans <strong>15 minutes</strong>.
         </p>
         <div style="text-align:center;margin:0 0 28px;">
-          <a href="${resetUrl}" style="display:inline-block;background:#1A1916;color:#fff;text-decoration:none;padding:12px 32px;font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;border-radius:2px;">
+          <a href="${resetUrl}" style="display:inline-block;background:#1E5FD4;color:#fff;text-decoration:none;padding:12px 32px;font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;border-radius:2px;">
             Réinitialiser mon mot de passe
           </a>
         </div>
-        <p style="font-size:0.75rem;color:#9A8E7E;margin:0;">
+        <p style="font-size:0.75rem;color:#6C7A93;margin:0;">
           Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.
         </p>
       `),
@@ -862,6 +912,88 @@ app.patch('/api/users/:id/disabled', requireAuth, requireAdmin, async (req, res)
   }
 });
 
+// ─── DELETE /api/users/:id — suppression définitive d'un compte (admin DJD) ────
+// Efface le compte de la base (les données liées suivent via ON DELETE CASCADE / SET NULL).
+app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  const targetId = parseInt(req.params.id, 10);
+  if (targetId === req.user.id)
+    return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte.' });
+  try {
+    const { rows } = await db.query('DELETE FROM users WHERE id = $1 RETURNING username', [targetId]);
+    if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    logActivity(req, 'user.delete', `@${rows[0].username}`);
+    res.json({ ok: true, id: targetId });
+  } catch (err) {
+    console.error('User delete error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ─── POST /api/users/:id/message — envoyer un message au compte via le chat support ─
+app.post('/api/users/:id/message', requireAuth, requireAdmin, async (req, res) => {
+  const targetId = parseInt(req.params.id, 10);
+  const body = (req.body.body || '').trim();
+  if (!body) return res.status(400).json({ error: 'Message vide.' });
+  if (body.length > 4000) return res.status(400).json({ error: 'Message trop long.' });
+  try {
+    const target = await db.query('SELECT username FROM users WHERE id = $1', [targetId]);
+    if (!target.rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    // Trouve la conversation du compte, sinon la crée.
+    let conv = await db.query('SELECT id FROM chat_conversations WHERE user_id = $1 ORDER BY id DESC LIMIT 1', [targetId]);
+    let convId = conv.rows[0]?.id;
+    if (!convId) {
+      const created = await db.query('INSERT INTO chat_conversations (user_id) VALUES ($1) RETURNING id', [targetId]);
+      convId = created.rows[0].id;
+    }
+    await db.query(
+      `INSERT INTO chat_messages (conversation_id, sender, body, read_by_staff) VALUES ($1, 'staff', $2, TRUE)`,
+      [convId, body]
+    );
+    await db.query(`UPDATE chat_conversations SET last_message_at = NOW(), status = 'open' WHERE id = $1`, [convId]);
+    logActivity(req, 'user.message', `@${target.rows[0].username}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('User message error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ─── Bande marquee « actualités & faits marquants » (contrôlée par l'admin) ────
+// La 1re bande du site (sous les secteurs). Lecture publique ; écriture admin.
+const MARQUEE_KEY = 'marquee_top';
+const MARQUEE_DEFAULT = { enabled: false, items: [] };
+
+app.get('/api/marquee', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [MARQUEE_KEY]);
+    const v = rows[0]?.value || MARQUEE_DEFAULT;
+    res.json({ enabled: !!v.enabled, items: Array.isArray(v.items) ? v.items : [] });
+  } catch (err) {
+    console.error('Marquee get error:', err);
+    res.json(MARQUEE_DEFAULT);
+  }
+});
+
+app.put('/api/marquee', requireAuth, requireAdmin, async (req, res) => {
+  const enabled = !!req.body.enabled;
+  const items = Array.isArray(req.body.items)
+    ? req.body.items.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
+    : [];
+  const value = { enabled, items };
+  try {
+    await db.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+      [MARQUEE_KEY, JSON.stringify(value)]
+    );
+    logActivity(req, 'marquee.update', enabled ? `ON (${items.length} ligne(s))` : 'OFF');
+    res.json(value);
+  } catch (err) {
+    console.error('Marquee update error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // ─── POST /api/contact ─────────────────────────────────────────────────────────
 app.post('/api/contact', async (req, res) => {
   const { name, email, message } = req.body;
@@ -870,27 +1002,27 @@ app.post('/api/contact', async (req, res) => {
 
   try {
     await resend.emails.send({
-      from:    SENDER_EMAIL,
+      from:    SENDER_FROM,
       to:      CONTACT_EMAIL,
       subject: `[${BRAND_NAME}] Nouveau message de ${name}`,
       html: `
-        <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; background: #EFECE5; border-radius: 6px; overflow: hidden;">
+        <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; background: #EAF1FB; border-radius: 6px; overflow: hidden;">
           <div style="background: #1a191600; padding: 32px 40px; text-align: center;">
             <img src="${BRAND_LOGO}" alt="${BRAND_NAME}" width="140" style="display:block;margin:0 auto;max-width:140px;" />
           </div>
           <div style="padding: 36px 40px;">
-            <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 6px;">Nouveau message reçu</h2>
-            <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#9A8E7E;margin:0 0 28px;">Formulaire de contact — Site web</p>
-            <hr style="border:none;border-top:1px solid #D4CFCA;margin:0 0 24px;" />
+            <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Nouveau message reçu</h2>
+            <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 28px;">Formulaire de contact — Site web</p>
+            <hr style="border:none;border-top:1px solid #DEE2E6;margin:0 0 24px;" />
             <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-              <tr><td style="padding:8px 0;color:#9A8E7E;width:90px;vertical-align:top;">Nom</td><td style="padding:8px 0;color:#1A1916;font-weight:600;">${name}</td></tr>
-              <tr><td style="padding:8px 0;color:#9A8E7E;vertical-align:top;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1A1916;">${email}</a></td></tr>
-              <tr><td style="padding:8px 0;color:#9A8E7E;vertical-align:top;">Message</td><td style="padding:8px 0;color:#1A1916;white-space:pre-line;line-height:1.7;">${message}</td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;width:90px;vertical-align:top;">Nom</td><td style="padding:8px 0;color:#1C2637;font-weight:600;">${name}</td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1C2637;">${email}</a></td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Message</td><td style="padding:8px 0;color:#1C2637;white-space:pre-line;line-height:1.7;">${message}</td></tr>
             </table>
-            <hr style="border:none;border-top:1px solid #D4CFCA;margin:28px 0 0;" />
+            <hr style="border:none;border-top:1px solid #DEE2E6;margin:28px 0 0;" />
           </div>
           <div style="padding:16px 40px 28px;text-align:center;">
-            <p style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#9A8E7E;margin:0;">${BRAND_NAME} — ${BRAND_TAGLINE}</p>
+            <p style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:#6C7A93;margin:0;">${BRAND_NAME} — ${BRAND_TAGLINE}</p>
           </div>
         </div>`,
     });
@@ -918,15 +1050,15 @@ app.post('/api/leads', async (req, res) => {
       [email.trim().toLowerCase(), (kind || '').slice(0, 40), (detail || '').slice(0, 200)]
     );
     resend.emails.send({
-      from:    SENDER_EMAIL,
+      from:    SENDER_FROM,
       to:      LEADS_EMAIL,
       subject: `[${BRAND_NAME}] Nouveau prospect — ${kind || 'contact'}`,
       html: emailLayout(`
-        <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 6px;">Nouveau prospect</h2>
-        <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#9A8E7E;margin:0 0 24px;">Capture d'email — Site web</p>
+        <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Nouveau prospect</h2>
+        <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 24px;">Capture d'email — Site web</p>
         <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-          <tr><td style="padding:8px 0;color:#9A8E7E;width:90px;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1A1916;">${email}</a></td></tr>
-          <tr><td style="padding:8px 0;color:#9A8E7E;">Source</td><td style="padding:8px 0;color:#1A1916;">${kind || '—'}${detail ? ' · ' + detail : ''}</td></tr>
+          <tr><td style="padding:8px 0;color:#6C7A93;width:90px;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1C2637;">${email}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#6C7A93;">Source</td><td style="padding:8px 0;color:#1C2637;">${kind || '—'}${detail ? ' · ' + detail : ''}</td></tr>
         </table>`),
     }).catch(() => {});
     res.status(201).json({ success: true });
@@ -1041,14 +1173,14 @@ app.post('/api/chat/messages', optionalAuth, async (req, res) => {
     if (wasIdle) {
       const who = req.user ? `@${req.user.username}` : (conv.guest_email || 'Visiteur');
       resend.emails.send({
-        from: SENDER_EMAIL,
+        from: SENDER_FROM,
         to: LEADS_EMAIL,
         subject: `[DJD] Nouveau message chat — ${who}`,
         html: emailLayout(`
-          <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 6px;">Nouveau message dans le chat</h2>
-          <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#9A8E7E;margin:0 0 24px;">De ${esc(who)}</p>
-          <p style="font-size:0.95rem;color:#1A1916;line-height:1.6;background:#EFECE5;padding:14px 16px;border-radius:6px;margin:0 0 20px;">${esc(body)}</p>
-          <a href="${APP_URL}" style="display:inline-block;background:#1A1916;color:#fff;text-decoration:none;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;padding:12px 22px;border-radius:4px;">Répondre depuis le dashboard</a>`),
+          <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Nouveau message dans le chat</h2>
+          <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 24px;">De ${esc(who)}</p>
+          <p style="font-size:0.95rem;color:#1C2637;line-height:1.6;background:#EAF1FB;padding:14px 16px;border-radius:6px;margin:0 0 20px;">${esc(body)}</p>
+          <a href="${APP_URL}" style="display:inline-block;background:#1E5FD4;color:#fff;text-decoration:none;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;padding:12px 22px;border-radius:4px;">Répondre depuis le dashboard</a>`),
       }).catch(() => {});
     }
 
@@ -1121,14 +1253,14 @@ app.post('/api/chat/conversations/:id/messages', requireAuth, requireAdmin, asyn
     }
     if (notify && toEmail) {
       resend.emails.send({
-        from: SENDER_EMAIL,
+        from: SENDER_FROM,
         to: toEmail,
         subject: `Réponse de ${BRAND_NAME}`,
         html: emailLayout(`
-          <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1A1916;margin:0 0 6px;">Vous avez une réponse</h2>
-          <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#9A8E7E;margin:0 0 24px;">Notre équipe vous a répondu</p>
-          <p style="font-size:0.95rem;color:#1A1916;line-height:1.6;background:#EFECE5;padding:14px 16px;border-radius:6px;margin:0 0 20px;">${esc(body)}</p>
-          <a href="${APP_URL}" style="display:inline-block;background:#1A1916;color:#fff;text-decoration:none;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;padding:12px 22px;border-radius:4px;">Poursuivre la conversation</a>`),
+          <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Vous avez une réponse</h2>
+          <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 24px;">Notre équipe vous a répondu</p>
+          <p style="font-size:0.95rem;color:#1C2637;line-height:1.6;background:#EAF1FB;padding:14px 16px;border-radius:6px;margin:0 0 20px;">${esc(body)}</p>
+          <a href="${APP_URL}" style="display:inline-block;background:#1E5FD4;color:#fff;text-decoration:none;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;padding:12px 22px;border-radius:4px;">Poursuivre la conversation</a>`),
       }).catch(() => {});
     }
     res.status(201).json({ message: rows[0] });
@@ -1156,12 +1288,68 @@ const SECTOR_MIN_LEVEL = {
 const sectorsForLevel = (level) =>
   VEILLE_SECTORS.filter(s => (SECTOR_MIN_LEVEL[s] ?? 1) <= level);
 
+// ── Accès découverte du plan Générale ────────────────────────────────────────
+// Un compte gratuit peut ouvrir jusqu'à 10 veilles sectorielles par fenêtre de 10 jours,
+// uniquement sur les secteurs politique, économie et social. La fenêtre démarre à la
+// première lecture ; 10 jours plus tard, le compteur repart de zéro.
+const FREE_QUOTA_SECTORS = ['politique', 'economie', 'social'];
+const FREE_QUOTA_LIMIT   = 10;
+const FREE_QUOTA_MS      = 10 * 24 * 60 * 60 * 1000;
+
+async function getFreeQuota(userId) {
+  const { rows } = await db.query(
+    'SELECT veille_id, read_at FROM veille_quota_reads WHERE user_id = $1 ORDER BY read_at',
+    [userId]
+  );
+  if (rows.length) {
+    const resetAt = new Date(new Date(rows[0].read_at).getTime() + FREE_QUOTA_MS);
+    if (Date.now() >= resetAt.getTime()) {
+      await db.query('DELETE FROM veille_quota_reads WHERE user_id = $1', [userId]); // fenêtre expirée
+    } else {
+      return {
+        used: rows.length,
+        limit: FREE_QUOTA_LIMIT,
+        remaining: Math.max(0, FREE_QUOTA_LIMIT - rows.length),
+        resetAt,
+        readIds: rows.map(r => r.veille_id),
+      };
+    }
+  }
+  return { used: 0, limit: FREE_QUOTA_LIMIT, remaining: FREE_QUOTA_LIMIT, resetAt: null, readIds: [] };
+}
+
 // Programmation comparée par DATE en heure locale (Madagascar) pour éviter les
 // décalages de fuseau (une date du jour stockée à minuit UTC tombait « dans le futur »).
 const APP_TZ = 'Indian/Antananarivo';
 const dlocal = (col) => `(${col} AT TIME ZONE '${APP_TZ}')::date`;
 const scheduledSql = (col) => `(${dlocal(col)} > ${dlocal('NOW()')})`;     // date future → programmée
 const visibleSql   = (col) => `(${dlocal(col)} <= ${dlocal('NOW()')})`;    // date ≤ aujourd'hui → visible
+
+// GET /api/veille/quota — état du quota découverte du plan Générale (affiché dans le profil).
+// applicable=false pour les admins et les plans payants (accès non limité par ce quota).
+app.get('/api/veille/quota', requireAuth, async (req, res) => {
+  try {
+    const u = await db.query('SELECT plan, is_admin FROM users WHERE id = $1', [req.user.id]);
+    if (!u.rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    const isAdmin = !!u.rows[0].is_admin;
+    const level   = PLAN_LEVEL[u.rows[0].plan] ?? 0;
+    if (isAdmin || level > 0) return res.json({ applicable: false, plan: u.rows[0].plan });
+    const q = await getFreeQuota(req.user.id);
+    res.json({
+      applicable: true,
+      plan: 'generale',
+      sectors: FREE_QUOTA_SECTORS,
+      windowDays: Math.round(FREE_QUOTA_MS / 86400000),
+      used: q.used,
+      limit: q.limit,
+      remaining: q.remaining,
+      resetAt: q.resetAt,
+    });
+  } catch (err) {
+    console.error('Veille quota error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 
 // GET /api/veille — liste (tous les connectés), filtres optionnels ?type=&sector=&q=
 // Filtrage par abonnement : un compte ne reçoit que les secteurs autorisés par son plan.
@@ -1182,7 +1370,11 @@ app.get('/api/veille', requireAuth, async (req, res) => {
       const allowed = sectorsForLevel(level);
       params.push(allowed);
       // visible si l'item a au moins un secteur autorisé (chevauchement) OU aucun secteur (actualité générale)
-      where.push(`(vi.sectors IS NULL OR vi.sectors && $${params.length}::text[])`);
+      // OU, pour la Générale, une veille déjà débloquée via le quota découverte (6 / 10 jours).
+      const quotaVis = userLevel === 0
+        ? ` OR vi.id IN (SELECT veille_id FROM veille_quota_reads WHERE user_id = $1)`
+        : '';
+      where.push(`(vi.sectors IS NULL OR vi.sectors && $${params.length}::text[]${quotaVis})`);
       // seules les veilles publiées sont visibles des abonnés (les brouillons restent internes)
       where.push(`vi.status = 'published'`);
       // les veilles programmées (date future) restent masquées jusqu'à leur date
@@ -1319,8 +1511,14 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
     );
     const required = SECTOR_MIN_LEVEL[sector] ?? 1;
     const tier = required >= 2 ? 'dediee' : 'sectorielle';
+    // Plan Générale : accès découverte (6 lectures / 10 jours) sur politique, économie, social.
+    let quota = null;
+    if (loggedIn && !isAdmin && level === 0 && required <= 1 && FREE_QUOTA_SECTORS.includes(sector)) {
+      quota = await getFreeQuota(req.user.id);
+    }
     // Aperçu compact UNIFORME pour tous (titre + extrait court + sources). `locked` =
-    // accès interdit au visiteur (→ inscription) ou au gratuit (→ abonnement).
+    // accès interdit au visiteur (→ inscription) ou au gratuit (→ abonnement),
+    // sauf veille déjà débloquée ou quota découverte encore disponible.
     const map = r => ({
       id: r.id,
       title: r.title,
@@ -1334,7 +1532,7 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
       sector: r.sector,
       sectors: r.sectors,
       published_at: r.published_at,
-      locked: !(isAdmin || level >= required),
+      locked: !(isAdmin || level >= required || (quota && (quota.readIds.includes(r.id) || quota.remaining > 0))),
       tier,
     });
 
@@ -1359,7 +1557,13 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
         else { if (groups[2].items.length < 3) groups[2].items.push(map(r)); }
       }
     }
-    res.json({ sector, loggedIn, level, groups });
+    res.json({
+      sector, loggedIn, level, groups,
+      quota: quota && {
+        used: quota.used, limit: quota.limit, remaining: quota.remaining, resetAt: quota.resetAt,
+        readIds: quota.readIds,
+      },
+    });
   } catch (err) {
     console.error('Veille sector error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1385,8 +1589,25 @@ app.get('/api/veille/:id', requireAuth, async (req, res) => {
       const allowed     = sectorsForLevel(level);
       const itemSectors = item.sectors?.length ? item.sectors : (item.sector ? [item.sector] : []);
       const sectorOk    = !itemSectors.length || itemSectors.some(s => allowed.includes(s));
-      if (item.status !== 'published' || item.scheduled || !sectorOk)
+      if (item.status !== 'published' || item.scheduled)
         return res.status(403).json({ error: 'Accès non autorisé.' });
+      if (!sectorOk) {
+        // Plan Générale : accès découverte (6 lectures / 10 jours sur politique, économie, social).
+        const eligible = level === 0 && itemSectors.some(s => FREE_QUOTA_SECTORS.includes(s));
+        if (!eligible) return res.status(403).json({ error: 'Accès non autorisé.' });
+        const quota = await getFreeQuota(req.user.id);
+        if (!quota.readIds.includes(item.id)) {
+          if (quota.remaining <= 0)
+            return res.status(403).json({
+              error: 'Quota de lectures gratuit atteint.',
+              quota: { used: quota.used, limit: quota.limit, remaining: 0, resetAt: quota.resetAt },
+            });
+          await db.query(
+            'INSERT INTO veille_quota_reads (user_id, veille_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [req.user.id, item.id]
+          );
+        }
+      }
     }
     // Médias réservés à la Dédiée : masqués aux autres (le reste de la veille reste visible).
     if (item.media_dediee && !isAdmin && level < 2) {
@@ -1642,13 +1863,13 @@ function alertEmailHtml(a) {
   let sourceLine = '';
   if (a.source || a.url) {
     const label = esc(a.source || 'Lien');
-    const value = a.url ? `<a href="${esc(a.url)}" style="color:#8B6B3D;">${label}</a>` : label;
-    sourceLine = `<p style="font-size:0.85rem;color:#6B6560;margin:20px 0 0;"><strong style="color:#9A8E7E;">Source :</strong> ${value}</p>`;
+    const value = a.url ? `<a href="${esc(a.url)}" style="color:#1E5FD4;">${label}</a>` : label;
+    sourceLine = `<p style="font-size:0.85rem;color:#3A4A63;margin:20px 0 0;"><strong style="color:#6C7A93;">Source :</strong> ${value}</p>`;
   }
   return emailLayout(`
     <p style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:${meta.color};font-weight:700;margin:0 0 12px;">${meta.kicker}</p>
-    ${dateStr ? `<p style="font-size:0.78rem;color:#9A8E7E;margin:0 0 6px;">${dateStr}</p>` : ''}
-    ${a.title ? `<h2 style="font-family:Georgia,serif;font-size:1.15rem;font-weight:400;color:#1A1916;line-height:1.45;margin:0 0 16px;">${esc(a.title)}</h2>` : ''}
+    ${dateStr ? `<p style="font-size:0.78rem;color:#6C7A93;margin:0 0 6px;">${dateStr}</p>` : ''}
+    ${a.title ? `<h2 style="font-family:Georgia,serif;font-size:1.15rem;font-weight:400;color:#1C2637;line-height:1.45;margin:0 0 16px;">${esc(a.title)}</h2>` : ''}
     ${a.context ? `<p style="font-size:0.95rem;color:#3A352F;line-height:1.7;white-space:pre-line;margin:0;">${esc(a.context)}</p>` : ''}
     ${sourceLine}
   `);
@@ -1666,7 +1887,7 @@ async function broadcastRealtimeAlert(alert) {
   const html    = alertEmailHtml(alert);
   for (let i = 0; i < recipients.length; i += 45) {
     resend.emails.send({
-      from: SENDER_EMAIL,
+      from: SENDER_FROM,
       to:   SENDER_EMAIL,
       bcc:  recipients.slice(i, i + 45),
       subject,
@@ -1765,22 +1986,23 @@ app.delete('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── Articles (rédigés par les admins) ──────────────────────────────────────────
-const ARTICLE_FIELDS = `id, sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, images, views, created_at`;
+const ARTICLE_FIELDS = `id, sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, views, created_at`;
 
 // POST /api/articles (admin) — créer
 app.post('/api/articles', requireAuth, requireAdmin, async (req, res) => {
-  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, images } = req.body;
+  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images } = req.body;
   if (!sector || !VEILLE_SECTORS.includes(sector)) return res.status(400).json({ error: 'Secteur invalide.' });
   if (!title?.trim())  return res.status(400).json({ error: 'Titre requis.' });
   if (!author?.trim()) return res.status(400).json({ error: 'Auteur requis.' });
   if (!published_at)   return res.status(400).json({ error: "Date d'ajout requise." });
   const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u) : null;
+  const pos  = typeof image_position === 'string' ? image_position.slice(0, 20) : null;
   try {
     const { rows } = await db.query(
-      `INSERT INTO articles (sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, images, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING ${ARTICLE_FIELDS}`,
+      `INSERT INTO articles (sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ${ARTICLE_FIELDS}`,
       [sector, title.trim(), description ?? null, author.trim(), author_role ?? null, published_at, creation_date || null,
-       read_minutes ? parseInt(read_minutes, 10) : null, (imgs && imgs[0]) || image || null, image_alt ?? null, imgs, req.user.id]
+       read_minutes ? parseInt(read_minutes, 10) : null, (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.user.id]
     );
     logActivity(req, 'article.create', title.trim());
     res.status(201).json(rows[0]);
@@ -1822,18 +2044,19 @@ app.get('/api/articles/:id', optionalAuth, async (req, res) => {
 
 // PATCH /api/articles/:id (admin)
 app.patch('/api/articles/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, images } = req.body;
+  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images } = req.body;
   if (sector && !VEILLE_SECTORS.includes(sector)) return res.status(400).json({ error: 'Secteur invalide.' });
   const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u) : null;
+  const pos  = typeof image_position === 'string' ? image_position.slice(0, 20) : null;
   try {
     const { rows } = await db.query(
       `UPDATE articles SET
          sector=COALESCE($1,sector), title=COALESCE($2,title), description=$3, author=COALESCE($4,author),
-         author_role=$5, published_at=COALESCE($6,published_at), creation_date=$7, read_minutes=$8, image=$9, image_alt=$10, images=$11
-       WHERE id=$12 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
+         author_role=$5, published_at=COALESCE($6,published_at), creation_date=$7, read_minutes=$8, image=$9, image_alt=$10, image_position=$11, images=$12
+       WHERE id=$13 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
       [sector ?? null, title?.trim() ?? null, description ?? null, author?.trim() ?? null, author_role ?? null,
        published_at ?? null, creation_date || null, read_minutes ? parseInt(read_minutes, 10) : null,
-       (imgs && imgs[0]) || image || null, image_alt ?? null, imgs, req.params.id]);
+       (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Article introuvable.' });
     logActivity(req, 'article.update', rows[0].title);
     res.json(rows[0]);
@@ -1879,7 +2102,8 @@ app.get('/api/favorites', requireAuth, async (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const DIST_FOLDER = path.join(__dirname, '..', 'dist', 'gazety-malagasy', 'browser');
   app.use(express.static(DIST_FOLDER));
-  app.get('*', (req, res) => {
+  // Express 5 : '*' seul n'est plus un chemin valide, il faut un paramètre nommé.
+  app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(DIST_FOLDER, 'index.html'));
   });
 }

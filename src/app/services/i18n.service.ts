@@ -118,6 +118,18 @@ const DICTIONARY: TranslationDict = {
     fr: 'Newsletter quotidienne',
     en: 'Daily newsletter',
   },
+  'feat.all_veilles': {
+    fr: 'Accès à toutes les veilles',
+    en: 'Access to all watches',
+  },
+  'feat.realtime_alerts': {
+    fr: 'Option alerte mail en temps réel',
+    en: 'Real-time email alert option',
+  },
+  'feat.custom_veilles': {
+    fr: 'Veilles personnalisées à la demande',
+    en: 'Custom watches on demand',
+  },
   'feat.basic_search': {
     fr: 'Recherche dans les archives (30 jours)',
     en: 'Archive search (30 days)',
@@ -270,10 +282,9 @@ export class I18nService {
   }
 
   private detectInitialLang(): Lang {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('gazety_lang') as Lang | null;
-      if (stored === 'fr' || stored === 'en') return stored;
-    }
+    // Site en français uniquement tant que le switch FR/EN est retiré
+    // (on ignore le localStorage pour ne pas bloquer en EN les visiteurs
+    // qui avaient basculé avant le retrait du bouton).
     return 'fr';
   }
 }

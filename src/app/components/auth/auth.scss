@@ -217,6 +217,28 @@
     margin: 0;
   }
 
+  // Alerte « vérifiez vos spams » sur l'écran de saisie du code (OTP)
+  &__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin: 0.85rem 0 0;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #f0c36d;
+    border-left-width: 3px;
+    border-radius: 6px;
+    background: #fff8e6;
+    color: #8a5a00;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  &__alert-icon {
+    flex-shrink: 0;
+    margin-top: 0.05rem;
+  }
+
   &__row {
     display: grid;
     grid-template-columns: 1fr 1fr;

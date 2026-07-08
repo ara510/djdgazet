@@ -177,6 +177,45 @@ export class AdminComponent implements OnDestroy {
     });
   }
 
+  /** Suppression définitive d'un compte (avec confirmation). */
+  async deleteUser(user: AdminUser) {
+    if (user.id === this.auth.currentUser()?.id) {
+      this.toast.show(this.fr ? 'Vous ne pouvez pas supprimer votre propre compte.' : 'You cannot delete your own account.', 'error');
+      return;
+    }
+    const ok = await this.toast.confirm({
+      title: this.fr ? `Supprimer définitivement @${user.username} ?` : `Permanently delete @${user.username}?`,
+      text: this.fr
+        ? 'Le compte et ses données seront effacés de la base. Cette action est irréversible.'
+        : 'The account and its data will be erased from the database. This cannot be undone.',
+      danger: true,
+      confirmText: this.fr ? 'Supprimer' : 'Delete',
+    });
+    if (!ok) return;
+    this.admin.deleteUser(user.id).subscribe({
+      next: () => {
+        this.admin.removeUserLocal(user.id);
+        this.toast.show(this.fr ? `@${user.username} supprimé.` : `@${user.username} deleted.`, 'success');
+      },
+      error: (err) => this.toast.show(err.error?.error || 'Erreur.', 'error'),
+    });
+  }
+
+  /** Envoie un message au compte via le chat support. */
+  async messageUser(user: AdminUser) {
+    const body = await this.toast.prompt({
+      title: this.fr ? `Message à @${user.username}` : `Message @${user.username}`,
+      text: this.fr ? 'Il apparaîtra dans son chat support.' : 'It will appear in their support chat.',
+      placeholder: this.fr ? 'Votre message…' : 'Your message…',
+      confirmText: this.fr ? 'Envoyer' : 'Send',
+    });
+    if (!body || !body.trim()) return;
+    this.admin.messageUser(user.id, body.trim()).subscribe({
+      next: () => this.toast.show(this.fr ? 'Message envoyé.' : 'Message sent.', 'success'),
+      error: (err) => this.toast.show(err.error?.error || 'Erreur.', 'error'),
+    });
+  }
+
   // ── Retours d'expérience ─────────────────────────────────────────────────────
   readonly feedbackCategories: Option[] = [
     { value: 'general',    fr: 'Général',      en: 'General'    },

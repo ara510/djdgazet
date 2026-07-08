@@ -11,6 +11,7 @@ import { AdminService, FeedbackItem, AdminUser } from '../../services/admin.serv
 import { ChatService, ChatConversation, ChatMessage } from '../../services/chat.service';
 import { VeilleIconComponent } from '../veille-icon/veille-icon';
 import { SeenDirective } from './seen.directive';
+import { sectorColor, sectorTint } from '../../services/sectors';
 
 interface Option { value: string; fr: string; en: string; }
 
@@ -69,7 +70,20 @@ export class DashboardComponent implements OnDestroy {
           this.galleryIndex.set(0);
           if (!this.isAdmin && !full.read) this.veille.setState(tid, { read: true }).subscribe({ error: () => {} });
         },
-        error: () => {},
+        error: err => {
+          // Quota découverte (plan Générale) épuisé : on prévient au lieu d'un écran vide.
+          const q = err?.error?.quota;
+          if (q) {
+            const fr = this.lang.lang() === 'fr';
+            const reset = q.resetAt ? new Date(q.resetAt).toLocaleDateString(fr ? 'fr-FR' : 'en-GB', { day: '2-digit', month: 'long' }) : '';
+            this.toast.show(
+              fr
+                ? `Quota découverte épuisé (${q.limit} veilles / 10 jours).${reset ? ` Remise à zéro le ${reset}.` : ''}`
+                : `Discovery quota reached (${q.limit} items / 10 days).${reset ? ` Resets on ${reset}.` : ''}`,
+              'error'
+            );
+          }
+        },
       });
     }
   }
@@ -475,6 +489,10 @@ export class DashboardComponent implements OnDestroy {
     const o = this.sectors.find(s => s.value === value);
     return o ? (this.fr ? o.fr : o.en) : '';
   }
+
+  /** Couleur / fond translucide d'un secteur (pastilles colorées à côté des titres). */
+  sectorColor(value?: string | null): string { return sectorColor(value); }
+  sectorTint(value?: string | null): string { return sectorTint(value); }
 
   /** Secteurs groupés par abonnement (pour les <optgroup> du formulaire). */
   get sectorGroups(): { label: string; options: Option[] }[] {
