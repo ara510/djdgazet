@@ -241,13 +241,13 @@ export class DashboardComponent implements OnDestroy {
 
   /** Aligne l'affichage des champs médias/lien sur le contenu chargé. */
   private syncMediaToggles() {
-    this.showUrl.set(!!this.form.url);
+    this.showUrl.set(this.form.urls.length > 0);
     this.showImages.set(this.form.images.length > 0);
     this.showVideo.set(!!this.form.video);
   }
 
   /** Annule l'ajout : vide le champ et replie sa section. */
-  cancelUrl()    { this.form.url = ''; this.showUrl.set(false); }
+  cancelUrl()    { this.form.urls = []; this.form.urlDraft = ''; this.showUrl.set(false); }
   cancelImages() { this.form.images = []; this.form.imageDraft = ''; this.showImages.set(false); }
   cancelVideo()  { this.form.video = ''; this.showVideo.set(false); }
   dateDisplay = ''; // date affichée/saisie en jj/mm/aaaa (form.published_at reste en ISO aaaa-mm-jj)
@@ -382,7 +382,7 @@ export class DashboardComponent implements OnDestroy {
   private emptyForm() {
     return {
       title: '', sources: [] as string[], sourceDraft: '', source_types: [] as string[], social_networks: [] as string[], sectors: [] as string[], tags: [] as string[], tone: '',
-      url: '', excerpt: '', images: [] as string[], imageDraft: '', video: '', author: '', published_at: '', status: 'published' as 'draft' | 'published',
+      urls: [] as string[], urlDraft: '', excerpt: '', images: [] as string[], imageDraft: '', video: '', author: '', published_at: '', status: 'published' as 'draft' | 'published',
       pinned: false,
       category: 'daily' as 'daily' | 'weekly', trends: '', signals: '',  // bulletin : tendances + signaux (facultatifs)
       media_dediee: false,  // médias réservés à la Dédiée
@@ -474,6 +474,21 @@ export class DashboardComponent implements OnDestroy {
 
   removeSource(value: string) {
     this.form.sources = this.form.sources.filter(s => s !== value);
+  }
+
+  // ── Liens de la source (saisie multiple, Entrée pour ajouter) ────────────
+  addUrl() {
+    const v = this.form.urlDraft.trim();
+    if (v && !this.form.urls.includes(v)) this.form.urls.push(v);
+    this.form.urlDraft = '';
+  }
+  removeUrl(value: string) {
+    this.form.urls = this.form.urls.filter(u => u !== value);
+  }
+
+  /** Liste des liens d'une veille/alerte (urls[] avec repli sur le champ url legacy). */
+  urlsOf(item: { url?: string | null; urls?: string[] | null }): string[] {
+    return item.urls?.length ? item.urls : (item.url ? [item.url] : []);
   }
 
   // ── Sélection multi-secteurs (éditeur) ───────────────────────────────────
@@ -809,7 +824,8 @@ export class DashboardComponent implements OnDestroy {
       sectors: item.sectors?.length ? [...item.sectors] : (item.sector ? [item.sector] : []),
       tags: item.tags?.length ? [...item.tags] : [],
       tone: item.tone ?? '',
-      url: item.url ?? '',
+      urls: item.urls?.length ? [...item.urls] : (item.url ? [item.url] : []),
+      urlDraft: '',
       excerpt: item.excerpt ?? '',
       images: item.images?.length ? [...item.images] : (item.image ? [item.image] : []),
       imageDraft: '',
@@ -965,7 +981,7 @@ export class DashboardComponent implements OnDestroy {
       sectors: this.form.sectors,
       tags: this.form.tags,
       tone: (this.form.tone || null) as VeilleItem['tone'],
-      url: this.form.url.trim() || null,
+      urls: this.form.urls,
       excerpt: this.form.excerpt.trim() || null,
       images: this.form.images,
       published_at: this.form.published_at || undefined,
@@ -1068,7 +1084,7 @@ export class DashboardComponent implements OnDestroy {
 
   private emptyAlertForm() {
     return {
-      title: '', sources: [] as string[], sourceDraft: '', url: '', context: '', published_at: '',
+      title: '', sources: [] as string[], sourceDraft: '', urls: [] as string[], urlDraft: '', context: '', published_at: '',
       level: 'neutre' as AlertLevel, notify: true,
       sectors: [] as string[], source_types: [] as string[], social_networks: [] as string[],
     };
@@ -1082,6 +1098,16 @@ export class DashboardComponent implements OnDestroy {
   }
   removeAlertSource(v: string) {
     this.alertForm.sources = this.alertForm.sources.filter(s => s !== v);
+  }
+
+  // Liens multiples de l'alerte (Entrée pour ajouter).
+  addAlertUrl() {
+    const v = this.alertForm.urlDraft.trim();
+    if (v && !this.alertForm.urls.includes(v)) this.alertForm.urls.push(v);
+    this.alertForm.urlDraft = '';
+  }
+  removeAlertUrl(v: string) {
+    this.alertForm.urls = this.alertForm.urls.filter(u => u !== v);
   }
 
   // Niveau de l'alerte = objet de l'email reçu par les abonnés Dédiée.
@@ -1149,7 +1175,8 @@ export class DashboardComponent implements OnDestroy {
       title: item.title ?? '',
       sources: item.sources?.length ? [...item.sources] : (item.source ? [item.source] : []),
       sourceDraft: '',
-      url: item.url ?? '',
+      urls: item.urls?.length ? [...item.urls] : (item.url ? [item.url] : []),
+      urlDraft: '',
       context: item.context ?? '',
       published_at: item.published_at ? item.published_at.slice(0, 10) : '',
       level: (item.level ?? 'neutre') as AlertLevel,
@@ -1170,7 +1197,7 @@ export class DashboardComponent implements OnDestroy {
     const body: Partial<AlertItem> = {
       title: this.alertForm.title.trim() || null,
       sources: this.alertForm.sources,
-      url: this.alertForm.url.trim() || null,
+      urls: this.alertForm.urls,
       context: this.alertForm.context.trim() || null,
       level: this.alertForm.level,
       notify: this.alertForm.notify,

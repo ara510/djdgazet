@@ -111,9 +111,9 @@
         <h2 class="vp-detail__title">{{ cardHeading(item) }}</h2>
         @if (item.author) { <p class="vp-detail__author">{{ fr ? 'Par' : 'By' }} {{ item.author }}</p> }
         @if (item.excerpt) { <p class="vp-detail__excerpt">{{ item.excerpt }}</p> }
-        @if (item.url) {
-          <a class="vp-detail__link" [href]="item.url" target="_blank" rel="noopener">
-            {{ fr ? 'Lire la source' : 'Read source' }}
+        @for (u of urlsOf(item); track u; let i = $index) {
+          <a class="vp-detail__link" [href]="u" target="_blank" rel="noopener">
+            {{ fr ? 'Lire la source' : 'Read source' }}@if (urlsOf(item).length > 1) { {{ i + 1 }} }
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
           </a>
         }

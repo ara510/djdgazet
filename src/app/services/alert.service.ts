@@ -11,6 +11,7 @@ export interface AlertItem {
   source?: string | null;
   sources?: string[];          // sources multiples (comme récap/bulletin)
   url?: string | null;
+  urls?: string[];             // liens multiples (url = urls[0], legacy)
   context?: string | null;
   level?: AlertLevel;          // objet de l'email : urgent / à surveiller / neutre
   notify?: boolean;            // envoi email à la publication (ON/OFF)

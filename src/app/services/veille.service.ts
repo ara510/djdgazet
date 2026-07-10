@@ -22,6 +22,7 @@ export interface VeilleItem {
   signals?: string | null;    // bulletin hebdo : signaux d'alerte (facultatif)
   media_dediee?: boolean;     // médias (photo/vidéo/lien) réservés à la Dédiée
   url?: string | null;
+  urls?: string[] | null;     // liens multiples de la source (url = urls[0], legacy)
   excerpt?: string | null;
   image?: string | null;
   images?: string[];

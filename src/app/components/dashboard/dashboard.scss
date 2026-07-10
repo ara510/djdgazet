@@ -880,6 +880,34 @@
     transition: background 0.2s, color 0.2s;
     &:hover { background: #c0392b; color: #fff; }
   }
+
+  // Lien (chip d'URL) : tronqué pour ne pas casser la mise en page
+  &__link {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-accent);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+// Petit numéro sur « Lire la source » quand il y a plusieurs liens
+.dash-card__link-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  margin-left: 3px;
+  border-radius: 8px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 // ─── Épingler (toggle éditeur) ────────────────────────────────────────────────

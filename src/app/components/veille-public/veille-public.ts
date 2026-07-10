@@ -70,6 +70,7 @@ export class VeillePublicComponent implements OnInit {
   tagsOf(i: VeilleItem): string[] { return i.tags?.length ? i.tags : []; }
   tagLabel(v?: string | null) { const o = v ? this.tagLabels[v] : null; return o ? (this.fr ? o.fr : o.en) : ''; }
   typesOf(i: VeilleItem): string[] { return i.source_types?.length ? i.source_types : (i.source_type ? [i.source_type] : []); }
+  urlsOf(i: VeilleItem): string[] { return i.urls?.length ? i.urls : (i.url ? [i.url] : []); }
   cardHeading(i: VeilleItem): string { return i.title || this.sectorLabel(i.sector) || i.source || this.typeLabel(i.source_type); }
   showSectorChip(i: VeilleItem): boolean { return !!i.title && !!i.sector; }
 
