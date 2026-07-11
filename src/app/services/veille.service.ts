@@ -38,6 +38,7 @@ export interface VeilleItem {
   deleted_at?: string | null;
   favorite?: boolean;
   read?: boolean;
+  locked?: boolean;           // accueil : teaser verrouillé (veille sectorielle payante)
 }
 
 export interface VeilleFilters {

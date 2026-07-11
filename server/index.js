@@ -785,17 +785,42 @@ app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── PATCH /api/users/:id/admin — promouvoir/rétrograder un admin (admin DJD) ──
+// Injecte un message « staff » dans le chat support d'un compte (crée la conversation
+// au besoin) → apparaît en non-lu chez l'utilisateur (badge du widget de chat).
+async function pushStaffMessage(userId, body) {
+  let conv = await db.query('SELECT id FROM chat_conversations WHERE user_id = $1 ORDER BY id DESC LIMIT 1', [userId]);
+  let convId = conv.rows[0]?.id;
+  if (!convId) {
+    const created = await db.query('INSERT INTO chat_conversations (user_id) VALUES ($1) RETURNING id', [userId]);
+    convId = created.rows[0].id;
+  }
+  await db.query(
+    `INSERT INTO chat_messages (conversation_id, sender, body, read_by_staff) VALUES ($1, 'staff', $2, TRUE)`,
+    [convId, body]
+  );
+  await db.query(`UPDATE chat_conversations SET last_message_at = NOW(), status = 'open' WHERE id = $1`, [convId]);
+  return convId;
+}
+
 app.patch('/api/users/:id/admin', requireAuth, requireAdmin, async (req, res) => {
   const isAdmin  = !!req.body.is_admin;
   const targetId = parseInt(req.params.id, 10);
   if (targetId === req.user.id)
     return res.status(400).json({ error: 'Vous ne pouvez pas modifier votre propre statut administrateur.' });
   try {
+    const before = await db.query('SELECT is_admin FROM users WHERE id = $1', [targetId]);
+    if (!before.rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    const wasAdmin = !!before.rows[0].is_admin;
     const { rows } = await db.query(
       'UPDATE users SET is_admin = $1 WHERE id = $2 RETURNING id, is_admin, username',
       [isAdmin, targetId]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    // Alerte au compte promu : message staff dans le chat support (badge non-lu).
+    if (isAdmin && !wasAdmin) {
+      await pushStaffMessage(targetId,
+        '🎉 Vous êtes désormais administrateur du site. Vous avez maintenant accès à l\'espace d\'administration (icône ⚙️ dans le menu) : gestion des veilles, des utilisateurs, des bandes d\'actualités et des réglages du site.'
+      ).catch(err => console.error('Promote notify error:', err));
+    }
     logActivity(req, isAdmin ? 'user.promote' : 'user.demote', `@${rows[0].username}`);
     res.json(rows[0]);
   } catch (err) {
@@ -942,18 +967,7 @@ app.post('/api/users/:id/message', requireAuth, requireAdmin, async (req, res) =
   try {
     const target = await db.query('SELECT username FROM users WHERE id = $1', [targetId]);
     if (!target.rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-    // Trouve la conversation du compte, sinon la crée.
-    let conv = await db.query('SELECT id FROM chat_conversations WHERE user_id = $1 ORDER BY id DESC LIMIT 1', [targetId]);
-    let convId = conv.rows[0]?.id;
-    if (!convId) {
-      const created = await db.query('INSERT INTO chat_conversations (user_id) VALUES ($1) RETURNING id', [targetId]);
-      convId = created.rows[0].id;
-    }
-    await db.query(
-      `INSERT INTO chat_messages (conversation_id, sender, body, read_by_staff) VALUES ($1, 'staff', $2, TRUE)`,
-      [convId, body]
-    );
-    await db.query(`UPDATE chat_conversations SET last_message_at = NOW(), status = 'open' WHERE id = $1`, [convId]);
+    await pushStaffMessage(targetId, body);
     logActivity(req, 'user.message', `@${target.rows[0].username}`);
     res.json({ ok: true });
   } catch (err) {
@@ -962,36 +976,54 @@ app.post('/api/users/:id/message', requireAuth, requireAdmin, async (req, res) =
   }
 });
 
-// ─── Bande marquee « actualités & faits marquants » (contrôlée par l'admin) ────
-// La 1re bande du site (sous les secteurs). Lecture publique ; écriture admin.
-const MARQUEE_KEY = 'marquee_top';
+// ─── Bandes marquee « actualités & faits marquants » (contrôlées par l'admin) ──
+// Bande 1 (`top`) = sous le header, sur tout le site. Bande 2 (`home`) = accueil,
+// juste avant « Veille média ». Lecture publique ; écriture admin.
+const MARQUEE_KEYS = { top: 'marquee_top', home: 'marquee_home' };
 const MARQUEE_DEFAULT = { enabled: false, items: [] };
+
+async function readMarqueeBand(key) {
+  const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [key]);
+  const v = rows[0]?.value || MARQUEE_DEFAULT;
+  return { enabled: !!v.enabled, items: Array.isArray(v.items) ? v.items : [] };
+}
+
+function cleanMarqueeBand(band) {
+  return {
+    enabled: !!(band && band.enabled),
+    items: Array.isArray(band && band.items)
+      ? band.items.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
+      : [],
+  };
+}
 
 app.get('/api/marquee', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [MARQUEE_KEY]);
-    const v = rows[0]?.value || MARQUEE_DEFAULT;
-    res.json({ enabled: !!v.enabled, items: Array.isArray(v.items) ? v.items : [] });
+    const [top, home] = await Promise.all([
+      readMarqueeBand(MARQUEE_KEYS.top),
+      readMarqueeBand(MARQUEE_KEYS.home),
+    ]);
+    res.json({ top, home });
   } catch (err) {
     console.error('Marquee get error:', err);
-    res.json(MARQUEE_DEFAULT);
+    res.json({ top: MARQUEE_DEFAULT, home: MARQUEE_DEFAULT });
   }
 });
 
 app.put('/api/marquee', requireAuth, requireAdmin, async (req, res) => {
-  const enabled = !!req.body.enabled;
-  const items = Array.isArray(req.body.items)
-    ? req.body.items.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
-    : [];
-  const value = { enabled, items };
+  const top  = cleanMarqueeBand(req.body.top);
+  const home = cleanMarqueeBand(req.body.home);
   try {
-    await db.query(
-      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
-      [MARQUEE_KEY, JSON.stringify(value)]
-    );
-    logActivity(req, 'marquee.update', enabled ? `ON (${items.length} ligne(s))` : 'OFF');
-    res.json(value);
+    for (const [key, value] of [[MARQUEE_KEYS.top, top], [MARQUEE_KEYS.home, home]]) {
+      await db.query(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+        [key, JSON.stringify(value)]
+      );
+    }
+    logActivity(req, 'marquee.update',
+      `top:${top.enabled ? 'ON' : 'OFF'}(${top.items.length}) home:${home.enabled ? 'ON' : 'OFF'}(${home.items.length})`);
+    res.json({ top, home });
   } catch (err) {
     console.error('Marquee update error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1491,6 +1523,126 @@ app.get('/api/veille/public', async (req, res) => {
     console.error('Veille public error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
+});
+
+// ─── Veilles « à la une » de l'accueil (section « Veille média ») ───────────────
+// Toutes les veilles taguées « Actualité » (Générale, sans secteur) s'affichent en
+// intégralité sur l'accueil. L'admin règle l'affichage via app_settings.home_veille :
+// activation, mode (toutes / sélection), ordre + nombre + échelle (taille des cartes).
+const HOME_VEILLE_KEY = 'home_veille';
+const HOME_SCALES = ['compact', 'normal', 'grand'];
+
+async function readHomeVeilleSettings() {
+  const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [HOME_VEILLE_KEY]);
+  const v = rows[0]?.value || {};
+  return {
+    enabled: v.enabled !== undefined ? !!v.enabled : true,
+    mode:    v.mode === 'pick' ? 'pick' : 'all',
+    ids:     Array.isArray(v.ids) ? v.ids.map(Number).filter(Number.isInteger) : [],
+    count:   Number.isInteger(v.count) && v.count > 0 ? v.count : 0,
+    scale:   HOME_SCALES.includes(v.scale) ? v.scale : 'normal',
+  };
+}
+
+// Champs complets d'une veille pour l'affichage « en intégralité » sur l'accueil.
+const HOME_VEILLE_SELECT = `id, title, source, sources, source_type, source_types, social_network, social_networks,
+  sector, sectors, tags, tone, url, urls, excerpt, image, author,
+  COALESCE(array_length(images, 1), 0) AS images_count, (video IS NOT NULL) AS has_video, published_at`;
+
+// Une veille avec secteur = contenu payant (Sectorielle/Dédiée) → teaser verrouillé sur
+// l'accueil : on garde les métadonnées (sources, types, secteur, image) mais on masque le
+// corps (extrait tronqué) et les liens externes. Les Actualité (sans secteur) restent en entier.
+function homeLock(item) {
+  const locked = Array.isArray(item.sectors) && item.sectors.length >= 1;
+  if (!locked) return { ...item, locked: false };
+  return {
+    ...item,
+    locked: true,
+    excerpt: (item.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 150),
+    url: null,
+    urls: null,
+    has_video: false,
+  };
+}
+
+// GET public : liste résolue des veilles Actualité + réglages d'affichage (échelle).
+app.get('/api/veille/home', async (req, res) => {
+  try {
+    const cfg = await readHomeVeilleSettings();
+    if (!cfg.enabled) return res.json({ enabled: false, scale: cfg.scale, items: [] });
+    const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
+
+    // Veilles explicitement choisies par l'admin (TOUS secteurs), dans l'ordre choisi.
+    let picked = [];
+    if (cfg.ids.length) {
+      const { rows } = await db.query(
+        `SELECT ${HOME_VEILLE_SELECT} FROM veille_items WHERE ${baseWhere} AND id = ANY($1::int[])`,
+        [cfg.ids]
+      );
+      const map = new Map(rows.map(r => [r.id, r]));
+      picked = cfg.ids.map(id => map.get(id)).filter(Boolean);
+    }
+
+    let items;
+    if (cfg.mode === 'pick') {
+      // Seulement la sélection (tous secteurs), dans l'ordre choisi.
+      items = picked;
+    } else {
+      // Toutes les actualités (auto) + la sélection en tête (position/mise en avant).
+      const auto = await db.query(
+        `SELECT ${HOME_VEILLE_SELECT} FROM veille_items
+         WHERE ${baseWhere} AND tags && ARRAY['actualite']::text[]
+         ORDER BY pinned DESC, published_at DESC, id DESC LIMIT 200`
+      );
+      const pickedIds = new Set(cfg.ids);
+      items = [...picked, ...auto.rows.filter(r => !pickedIds.has(r.id))];
+    }
+    if (cfg.count > 0) items = items.slice(0, cfg.count);
+    res.json({ enabled: true, scale: cfg.scale, items: items.map(homeLock) });
+  } catch (err) {
+    console.error('Veille home error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// GET admin : réglages actuels de la section accueil.
+app.get('/api/veille/home/settings', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json(await readHomeVeilleSettings()); }
+  catch (err) { console.error('Home veille settings get error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// GET admin : veilles candidates (TOUS secteurs + actualité) pour la sélection.
+app.get('/api/veille/home/candidates', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, title, excerpt, image, sector, sectors, tags, published_at, pinned FROM veille_items
+       WHERE deleted_at IS NULL AND status = 'published'
+       ORDER BY pinned DESC, published_at DESC, id DESC LIMIT 300`
+    );
+    res.json(rows);
+  } catch (err) { console.error('Home veille candidates error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// PUT admin : enregistre les réglages de la section accueil.
+app.put('/api/veille/home/settings', requireAuth, requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  const value = {
+    enabled: b.enabled !== undefined ? !!b.enabled : true,
+    mode:    b.mode === 'pick' ? 'pick' : 'all',
+    ids:     Array.isArray(b.ids) ? [...new Set(b.ids.map(Number).filter(Number.isInteger))].slice(0, 100) : [],
+    count:   Number.isInteger(b.count) && b.count > 0 ? Math.min(b.count, 100) : 0,
+    scale:   HOME_SCALES.includes(b.scale) ? b.scale : 'normal',
+  };
+  try {
+    await db.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+      [HOME_VEILLE_KEY, JSON.stringify(value)]
+    );
+    logActivity(req, 'home_veille.update',
+      `${value.enabled ? 'ON' : 'OFF'} ${value.mode} n:${value.count || '∞'} ${value.scale} (${value.ids.length} choisie(s))`);
+    res.json(value);
+  } catch (err) { console.error('Home veille settings update error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
 });
 
 // GET /api/veille/sector/:sector — veilles d'un secteur, avec gating selon le visiteur :
