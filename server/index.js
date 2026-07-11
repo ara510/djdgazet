@@ -1549,11 +1549,14 @@ const HOME_VEILLE_SELECT = `id, title, source, sources, source_type, source_type
   sector, sectors, tags, tone, url, urls, excerpt, image, author,
   COALESCE(array_length(images, 1), 0) AS images_count, (video IS NOT NULL) AS has_video, published_at`;
 
-// Une veille avec secteur = contenu payant (Sectorielle/Dédiée) → teaser verrouillé sur
-// l'accueil : on garde les métadonnées (sources, types, secteur, image) mais on masque le
-// corps (extrait tronqué) et les liens externes. Les Actualité (sans secteur) restent en entier.
+// Verrou teaser sur l'accueil : une veille rattachée à un secteur SANS être taguée
+// « Actualité » = contenu payant (Sectorielle/Dédiée) → on garde les métadonnées
+// (sources, types, secteur, image) mais on masque le corps (extrait tronqué) et les
+// liens. Les Actualité (même avec un secteur) restent gratuites, donc en entier.
 function homeLock(item) {
-  const locked = Array.isArray(item.sectors) && item.sectors.length >= 1;
+  const hasSector   = Array.isArray(item.sectors) && item.sectors.length >= 1;
+  const isActualite = Array.isArray(item.tags) && item.tags.includes('actualite');
+  const locked = hasSector && !isActualite;
   if (!locked) return { ...item, locked: false };
   return {
     ...item,
