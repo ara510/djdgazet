@@ -48,6 +48,14 @@ export class HomeComponent {
       default:        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
     }
   });
+  /** Hauteur d'image (object-cover, sans letterbox) selon l'échelle. */
+  readonly imgClass = computed(() => {
+    switch (this.homeScale()) {
+      case 'compact': return 'h-40';
+      case 'grand':   return 'h-64';
+      default:        return 'h-48';
+    }
+  });
   constructor() {
     this.articlesSvc.list().subscribe({
       next: rows => { this.articles.set(rows); this.loadingArticles.set(false); },
