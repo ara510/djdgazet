@@ -1546,7 +1546,7 @@ async function readHomeVeilleSettings() {
 
 // Champs complets d'une veille pour l'affichage « en intégralité » sur l'accueil.
 const HOME_VEILLE_SELECT = `id, title, source, sources, source_type, source_types, social_network, social_networks,
-  sector, sectors, tags, tone, url, urls, excerpt, image, author,
+  sector, sectors, tags, tone, url, urls, excerpt, image, images, author,
   COALESCE(array_length(images, 1), 0) AS images_count, (video IS NOT NULL) AS has_video, published_at`;
 
 // Verrou teaser sur l'accueil : une veille rattachée à un secteur SANS être taguée

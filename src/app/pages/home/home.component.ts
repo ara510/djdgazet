@@ -9,12 +9,13 @@ import { HomeVeilleService, HomeScale } from '../../services/home-veille.service
 import { ArticleService, ArticleItem } from '../../services/article.service';
 import { MarqueeBarComponent } from '../../components/marquee-bar/marquee-bar.component';
 import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
+import { ImageCarouselComponent } from '../../components/image-carousel/image-carousel.component';
 import { sectorColor, sectorTint } from '../../services/sectors';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, MarqueeBarComponent, VeilleIconComponent],
+  imports: [CommonModule, RouterLink, MarqueeBarComponent, VeilleIconComponent, ImageCarouselComponent],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
@@ -105,7 +106,8 @@ export class HomeComponent {
   netColor(n?: string | null): string { return this.NET_COLORS[n || ''] || '#607D8B'; }
   secColor(s?: string | null): string { return sectorColor(s); }
   secTint(s?: string | null): string { return sectorTint(s); }
-  imgCount(v: VeilleItem): number { return v.images_count ?? 0; }
+  /** Toutes les images de la veille (tableau `images`, repli sur l'image principale). */
+  imagesOf(v: VeilleItem): string[] { return v.images?.length ? v.images : (v.image ? [v.image] : []); }
 
   formatDate(value?: string): string {
     if (!value) return '';

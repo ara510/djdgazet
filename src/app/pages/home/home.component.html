@@ -91,18 +91,12 @@
       <div class="grid gap-5" [ngClass]="gridClass()">
         @for (v of veilles(); track v.id) {
           <article class="group relative bg-white border border-silver-200 rounded-lg overflow-hidden flex flex-col hover:border-gazety-red hover:shadow-md transition-all">
-            <!-- Photo (cadrée, sans letterbox) — toujours visible, même verrouillée -->
-            @if (v.image) {
+            <!-- Photos (cadrées, sans letterbox) — défilent en boucle si plusieurs ; toujours visibles -->
+            @if (imagesOf(v).length) {
               <div class="relative bg-silver-100 overflow-hidden" [ngClass]="imgClass()">
-                <img [src]="v.image" [alt]="heading(v)" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
-                @if (imgCount(v) > 1) {
-                  <span class="absolute bottom-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[11px] font-semibold">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    {{ imgCount(v) }}
-                  </span>
-                }
+                <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)" />
                 @if (v.locked) {
-                  <span class="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gazety-dark/90 text-white text-[10px] font-bold uppercase tracking-wide">
+                  <span class="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gazety-dark/90 text-white text-[10px] font-bold uppercase tracking-wide">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     {{ fr() ? 'Abonnés' : 'Members' }}
                   </span>
