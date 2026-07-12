@@ -7,11 +7,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Le premier journal en ligne dédié à l'actualité malgache. Politique, économie, culture, sport et plus.">
   <link rel="icon" type="image/png" href="assets/haydlines-logo.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Source+Serif+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <!-- Polices du sous-système Veille (dashboard/vitrine) -->
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Polices auto-hébergées (Inter, Playfair Display, Cormorant Garamond, Poppins) —
+       latin + latin-ext, graisses réellement utilisées. Plus de dépendance à Google Fonts.
+       Chargé en ASYNCHRONE (non bloquant) : le texte s'affiche immédiatement (font-display:swap),
+       les polices s'appliquent dès qu'elles arrivent — crucial sur lien à forte perte de paquets. -->
+  <link rel="stylesheet" href="assets/fonts/fonts.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="assets/fonts/fonts.css"></noscript>
 </head>
 <body class="bg-white text-gazety-dark antialiased">
   <app-root></app-root>
