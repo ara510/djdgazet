@@ -65,12 +65,96 @@ const db = new Pool({
   password: process.env.DB_PASSWORD || '',
 });
 
+// Derrière nginx (reverse proxy) : req.ip = vraie IP client (via X-Forwarded-For).
+app.set('trust proxy', 1);
+app.disable('x-powered-by'); // ne pas divulguer la pile technique
+
 // En dev : CORS vers Angular dev server. En prod : même domaine, pas besoin de CORS.
 if (process.env.NODE_ENV !== 'production') {
   app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:4200' }));
 }
-app.use(express.json({ limit: '10mb' })); // les médias passent par /api/upload (multipart), plus en base64
+
+// ─── En-têtes de sécurité (défense en profondeur, appliqués à toutes les réponses API) ──
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');            // pas de MIME-sniffing
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');                // anti-clickjacking
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// JSON = texte + éventuel avatar base64 (les médias veille passent par /api/upload multipart).
+// 2 Mo suffit largement à un avatar redimensionné ; fini les payloads de 10 Mo (anti-abus).
+app.use(express.json({ limit: '2mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '30d' }));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SÉCURITÉ — nettoyage des entrées + limitation de débit (rate limiting)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Retire les caractères de contrôle, coupe les espaces en bordure, borne la longueur.
+function cleanStr(v, max = 500) {
+  if (v == null) return '';
+  return String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+}
+// Valide une adresse email (format + longueur RFC).
+function isEmail(v) { return typeof v === 'string' && v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+// Échappe le HTML — pour tout texte utilisateur inséré dans du HTML (emails notamment).
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;' }[c]));
+}
+// Nettoie du HTML riche (contenu d'article) : CONSERVE la mise en forme (balises, styles inline,
+// classes, liens, images) mais retire les vecteurs XSS — balises exécutables, gestionnaires
+// d'événements (onclick…), URLs javascript:. Défense en profondeur (contenu rédigé par un admin).
+function sanitizeRichHtml(html) {
+  if (html == null) return null;
+  let s = String(html);
+  s = s.replace(/<\s*(script|style|iframe|object|embed|form|link|meta|base)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, ''); // balise + contenu
+  s = s.replace(/<\s*(script|style|iframe|object|embed|form|link|meta|base)\b[^>]*>/gi, '');                  // balises orphelines
+  s = s.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');                                             // handlers onX=
+  s = s.replace(/(\b(?:href|src)\s*=\s*)(["']?)\s*(?:javascript|vbscript)\s*:[^"'>\s]*/gi, '$1$2#');          // href/src javascript:
+  s = s.replace(/style\s*=\s*("[^"]*"|'[^']*')/gi, m => m.replace(/(javascript|expression|vbscript)\s*:/gi, '')); // style: javascript:
+  return s;
+}
+
+// ─── Rate limiting en mémoire (sans dépendance ; pm2 = un seul process) ──────────
+const rlStore = new Map(); // clé "name:identifiant" → { count, resetAt }
+function rateLimit({ name, windowMs, max, by, message }) {
+  return (req, res, next) => {
+    const who = by ? by(req) : req.ip;
+    if (!who) return next(); // pas d'identifiant fiable → on laisse passer
+    const key = `${name}:${who}`;
+    const now = Date.now();
+    let e = rlStore.get(key);
+    if (!e || e.resetAt <= now) { e = { count: 0, resetAt: now + windowMs }; rlStore.set(key, e); }
+    e.count++;
+    res.setHeader('RateLimit-Limit', max);
+    res.setHeader('RateLimit-Remaining', Math.max(0, max - e.count));
+    res.setHeader('RateLimit-Reset', Math.ceil((e.resetAt - now) / 1000));
+    if (e.count > max) {
+      res.setHeader('Retry-After', Math.ceil((e.resetAt - now) / 1000));
+      return res.status(429).json({ error: message || 'Trop de requêtes. Réessayez dans un instant.' });
+    }
+    next();
+  };
+}
+// Purge périodique des compteurs expirés (aucune fuite mémoire).
+setInterval(() => { const now = Date.now(); for (const [k, e] of rlStore) if (e.resetAt <= now) rlStore.delete(k); }, 60_000).unref();
+
+// Backstop global anti-surcharge : seuil élevé + par IP → n'entrave pas l'usage normal,
+// même derrière un partage d'IP (CGNAT Telma/Orange). Coupe seulement un flood anormal.
+const apiLimiter        = rateLimit({ name: 'api',      windowMs: 60_000,      max: 1000, message: 'Trop de requêtes, veuillez ralentir.' });
+// Authentification non connectée (par IP) : anti brute-force, tolérant au partage d'IP.
+const authLimiter       = rateLimit({ name: 'auth',     windowMs: 15 * 60_000, max: 40,   message: 'Trop de tentatives. Réessayez dans quelques minutes.' });
+// Mot de passe oublié (par IP) : envoie un email → plus strict.
+const forgotLimiter     = rateLimit({ name: 'forgot',   windowMs: 60 * 60_000, max: 8,    message: 'Trop de demandes. Réessayez plus tard.' });
+// Formulaires publics qui envoient un email (contact, prospect) — par IP.
+const publicMailLimiter = rateLimit({ name: 'pmail',    windowMs: 60 * 60_000, max: 12,   message: 'Trop d\'envois. Réessayez plus tard.' });
+// Envoi d'un code OTP (par utilisateur connecté) : coût d'email Resend.
+const otpSendLimiter    = rateLimit({ name: 'otpsend',  windowMs: 60 * 60_000, max: 6,  by: r => r.user?.id, message: 'Trop d\'envois de code. Réessayez plus tard.' });
+// Vérification d'un code OTP (par utilisateur) : empêche le brute-force du code à 6 chiffres.
+const otpCheckLimiter   = rateLimit({ name: 'otpcheck', windowMs: 15 * 60_000, max: 12, by: r => r.user?.id, message: 'Trop d\'essais. Réessayez dans quelques minutes.' });
+
+app.use('/api', apiLimiter); // limiteur global appliqué à toute l'API
 
 // Table de base : users doit exister avant les migrations et les FK ci-dessous.
 // (Sur une base vierge, certaines requêtes suivantes peuvent échouer au premier
@@ -122,8 +206,8 @@ db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL D
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
 // Admin = email du domaine de la marque (configurable via .env). Synchronise les comptes existants.
 const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour.com').toLowerCase();
-db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE '%${BOOT_ADMIN_DOMAIN}' AND is_admin = FALSE`).catch(() => {});
-db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE '%${BOOT_ADMIN_DOMAIN}' AND is_admin = TRUE`).catch(() => {});
+db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE $1 AND is_admin = FALSE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
+db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
 db.query(`
   CREATE TABLE IF NOT EXISTS veille_items (
     id             SERIAL PRIMARY KEY,
@@ -380,14 +464,25 @@ function logActivity(req, action, target) {
 }
 
 // ─── POST /api/auth/register ───────────────────────────────────────────────────
-app.post('/api/auth/register', async (req, res) => {
-  const { nom, prenoms, date_naissance, email, username, password } = req.body;
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  let { nom, prenoms, date_naissance, email, username, password } = req.body;
+  nom      = cleanStr(nom, 100);
+  prenoms  = cleanStr(prenoms, 100);
+  email    = cleanStr(email, 254);
+  username = cleanStr(username, 30);
+  date_naissance = cleanStr(date_naissance, 20);
 
   if (!nom || !prenoms || !date_naissance || !email || !username || !password)
     return res.status(400).json({ error: 'Tous les champs sont requis.' });
 
-  if (!/^[a-zA-Z0-9]+$/.test(username))
-    return res.status(400).json({ error: 'Le nom d\'utilisateur ne peut contenir que des lettres et des chiffres.' });
+  if (!isEmail(email))
+    return res.status(400).json({ error: 'Adresse email invalide.' });
+
+  if (typeof password !== 'string' || password.length > 200)
+    return res.status(400).json({ error: 'Mot de passe invalide.' });
+
+  if (!/^[a-zA-Z0-9]+$/.test(username) || username.length < 3)
+    return res.status(400).json({ error: 'Le nom d\'utilisateur doit contenir 3 à 30 lettres ou chiffres.' });
 
   if (
     password.length < 8 ||
@@ -417,9 +512,12 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // ─── POST /api/auth/login ──────────────────────────────────────────────────────
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
+app.post('/api/auth/login', authLimiter, async (req, res) => {
+  const username = cleanStr(req.body?.username, 30);
+  const password = req.body?.password;
   if (!username || !password) return res.status(400).json({ error: 'Champs manquants.' });
+  if (typeof password !== 'string' || password.length > 200)
+    return res.status(401).json({ error: 'Identifiants incorrects.' });
 
   try {
     const { rows } = await db.query(
@@ -460,13 +558,25 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 
 // ─── PATCH /api/auth/me ────────────────────────────────────────────────────────
 app.patch('/api/auth/me', requireAuth, async (req, res) => {
-  const { nom, prenoms, email, username, date_naissance, avatar, telephone, pays, ville, genre, notif_email, currentPassword, newPassword } = req.body;
+  let { nom, prenoms, email, username, date_naissance, avatar, telephone, pays, ville, genre, notif_email, currentPassword, newPassword } = req.body;
+  nom      = cleanStr(nom, 100);
+  prenoms  = cleanStr(prenoms, 100);
+  email    = cleanStr(email, 254);
+  username = cleanStr(username, 30);
+  date_naissance = cleanStr(date_naissance, 20);
+  telephone = telephone == null ? telephone : cleanStr(telephone, 30);
+  pays      = pays  == null ? pays  : cleanStr(pays, 100);
+  ville     = ville == null ? ville : cleanStr(ville, 100);
+  genre     = genre == null ? genre : cleanStr(genre, 30);
 
   if (!nom || !prenoms || !email || !username || !date_naissance)
     return res.status(400).json({ error: 'Champs requis manquants.' });
 
-  if (!/^[a-zA-Z0-9]+$/.test(username))
-    return res.status(400).json({ error: 'Le nom d\'utilisateur ne peut contenir que des lettres et des chiffres.' });
+  if (!isEmail(email))
+    return res.status(400).json({ error: 'Adresse email invalide.' });
+
+  if (!/^[a-zA-Z0-9]+$/.test(username) || username.length < 3)
+    return res.status(400).json({ error: 'Le nom d\'utilisateur doit contenir 3 à 30 lettres ou chiffres.' });
 
   try {
     const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
@@ -589,7 +699,7 @@ function emailLayout(content) {
 }
 
 // ─── POST /api/auth/send-otp ──────────────────────────────────────────────────
-app.post('/api/auth/send-otp', requireAuth, async (req, res) => {
+app.post('/api/auth/send-otp', requireAuth, otpSendLimiter, async (req, res) => {
   try {
     const { rows } = await db.query('SELECT email, email_verified FROM users WHERE id = $1', [req.user.id]);
     if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
@@ -636,7 +746,7 @@ app.post('/api/auth/send-otp', requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
-app.post('/api/auth/verify-otp', requireAuth, async (req, res) => {
+app.post('/api/auth/verify-otp', requireAuth, otpCheckLimiter, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Code requis.' });
 
@@ -662,7 +772,7 @@ app.post('/api/auth/verify-otp', requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/auth/forgot-password ───────────────────────────────────────────
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', forgotLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email requis.' });
 
@@ -704,7 +814,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // ─── POST /api/auth/reset-password ────────────────────────────────────────────
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Token et mot de passe requis.' });
 
@@ -1031,10 +1141,14 @@ app.put('/api/marquee', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── POST /api/contact ─────────────────────────────────────────────────────────
-app.post('/api/contact', async (req, res) => {
-  const { name, email, message } = req.body;
+app.post('/api/contact', publicMailLimiter, async (req, res) => {
+  const name    = cleanStr(req.body?.name, 100);
+  const email   = cleanStr(req.body?.email, 254);
+  const message = cleanStr(req.body?.message, 5000);
   if (!name || !email || !message)
     return res.status(400).json({ error: 'Champs manquants.' });
+  if (!isEmail(email))
+    return res.status(400).json({ error: 'Adresse email invalide.' });
 
   try {
     await resend.emails.send({
@@ -1051,9 +1165,9 @@ app.post('/api/contact', async (req, res) => {
             <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 28px;">Formulaire de contact — Site web</p>
             <hr style="border:none;border-top:1px solid #DEE2E6;margin:0 0 24px;" />
             <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-              <tr><td style="padding:8px 0;color:#6C7A93;width:90px;vertical-align:top;">Nom</td><td style="padding:8px 0;color:#1C2637;font-weight:600;">${name}</td></tr>
-              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1C2637;">${email}</a></td></tr>
-              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Message</td><td style="padding:8px 0;color:#1C2637;white-space:pre-line;line-height:1.7;">${message}</td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;width:90px;vertical-align:top;">Nom</td><td style="padding:8px 0;color:#1C2637;font-weight:600;">${escapeHtml(name)}</td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Email</td><td style="padding:8px 0;"><a href="mailto:${escapeHtml(email)}" style="color:#1C2637;">${escapeHtml(email)}</a></td></tr>
+              <tr><td style="padding:8px 0;color:#6C7A93;vertical-align:top;">Message</td><td style="padding:8px 0;color:#1C2637;white-space:pre-line;line-height:1.7;">${escapeHtml(message)}</td></tr>
             </table>
             <hr style="border:none;border-top:1px solid #DEE2E6;margin:28px 0 0;" />
           </div>
@@ -1076,9 +1190,11 @@ app.post('/api/contact', async (req, res) => {
 
 // ─── POST /api/leads — capture d'email (rapport d'exemple, ressources…) (public) ──
 const LEADS_EMAIL = CONTACT_EMAIL; // destinataire des notifications prospects
-app.post('/api/leads', async (req, res) => {
-  const { email, kind, detail } = req.body;
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+app.post('/api/leads', publicMailLimiter, async (req, res) => {
+  const email  = cleanStr(req.body?.email, 254);
+  const kind   = cleanStr(req.body?.kind, 40);
+  const detail = cleanStr(req.body?.detail, 200);
+  if (!isEmail(email))
     return res.status(400).json({ error: 'Adresse email invalide.' });
   try {
     await db.query(
@@ -1093,8 +1209,8 @@ app.post('/api/leads', async (req, res) => {
         <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Nouveau prospect</h2>
         <p style="font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;color:#6C7A93;margin:0 0 24px;">Capture d'email — Site web</p>
         <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-          <tr><td style="padding:8px 0;color:#6C7A93;width:90px;">Email</td><td style="padding:8px 0;"><a href="mailto:${email}" style="color:#1C2637;">${email}</a></td></tr>
-          <tr><td style="padding:8px 0;color:#6C7A93;">Source</td><td style="padding:8px 0;color:#1C2637;">${kind || '—'}${detail ? ' · ' + detail : ''}</td></tr>
+          <tr><td style="padding:8px 0;color:#6C7A93;width:90px;">Email</td><td style="padding:8px 0;"><a href="mailto:${escapeHtml(email)}" style="color:#1C2637;">${escapeHtml(email)}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#6C7A93;">Source</td><td style="padding:8px 0;color:#1C2637;">${escapeHtml(kind || '—')}${detail ? ' · ' + escapeHtml(detail) : ''}</td></tr>
         </table>`),
     }).catch(() => {});
     res.status(201).json({ success: true });
@@ -2173,7 +2289,7 @@ app.post('/api/articles', requireAuth, requireAdmin, async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO articles (sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ${ARTICLE_FIELDS}`,
-      [sector, title.trim(), description ?? null, author.trim(), author_role ?? null, published_at, creation_date || null,
+      [sector, title.trim(), sanitizeRichHtml(description), author.trim(), author_role ?? null, published_at, creation_date || null,
        read_minutes ? parseInt(read_minutes, 10) : null, (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.user.id]
     );
     logActivity(req, 'article.create', title.trim());
@@ -2204,6 +2320,7 @@ app.get('/api/articles/:id', optionalAuth, async (req, res) => {
     if (req.user) {
       const f = await db.query('SELECT 1 FROM article_favorites WHERE user_id=$1 AND article_id=$2', [req.user.id, article.id]);
       article.favorite = f.rows.length > 0;
+      article.description = sanitizeRichHtml(article.description); // filet de sécurité au rendu (contenu existant inclus)
     } else {
       // Visiteur sans compte : aperçu seulement (titre + quelques lignes), lecture complète = compte requis.
       const plain = (article.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -2226,7 +2343,7 @@ app.patch('/api/articles/:id', requireAuth, requireAdmin, async (req, res) => {
          sector=COALESCE($1,sector), title=COALESCE($2,title), description=$3, author=COALESCE($4,author),
          author_role=$5, published_at=COALESCE($6,published_at), creation_date=$7, read_minutes=$8, image=$9, image_alt=$10, image_position=$11, images=$12
        WHERE id=$13 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
-      [sector ?? null, title?.trim() ?? null, description ?? null, author?.trim() ?? null, author_role ?? null,
+      [sector ?? null, title?.trim() ?? null, sanitizeRichHtml(description), author?.trim() ?? null, author_role ?? null,
        published_at ?? null, creation_date || null, read_minutes ? parseInt(read_minutes, 10) : null,
        (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Article introuvable.' });
