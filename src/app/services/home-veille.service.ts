@@ -23,6 +23,7 @@ export interface HomeVeilleCandidate {
   sector?: string | null;
   sectors?: string[] | null;
   tags?: string[] | null;
+  source_types?: string[] | null;
   published_at: string;
   pinned?: boolean;
 }
@@ -32,6 +33,20 @@ export interface HomeVeilleResponse {
   scale: HomeScale;
   items: VeilleItem[];
 }
+
+/** Fil « Dernières actualités » de l'accueil (liste compacte paginée). */
+export interface LatestResponse {
+  items: VeilleItem[];
+  cat?: 'actualite' | 'fait_marquant';
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+  gated: boolean;   // visiteur : la suite nécessite un compte
+}
+
+/** Catégories gratuites (plan Générale) affichées en fil façon Facebook. */
+export type FeedCat = 'actualite' | 'fait_marquant';
 
 @Injectable({ providedIn: 'root' })
 export class HomeVeilleService {
@@ -47,9 +62,23 @@ export class HomeVeilleService {
     return { Authorization: `Bearer ${this.auth.token()}` };
   }
 
-  /** Liste publique résolue (affichée dans « Veille média » sur l'accueil). */
+  /** Liste résolue affichée dans « Veille média » sur l'accueil.
+   *  Le token est transmis QUAND il existe (endpoint en optionalAuth) : le serveur peut
+   *  alors déverrouiller les teasers payants pour un admin / un abonné au bon niveau,
+   *  et lever le plafond de 6 items réservé aux visiteurs. Sans token → visiteur anonyme. */
   loadPublic() {
-    return this.http.get<HomeVeilleResponse>('/api/veille/home');
+    const token = this.auth.token();
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    return this.http.get<HomeVeilleResponse>('/api/veille/home', { headers });
+  }
+
+  /** Fil paginé d'une catégorie gratuite (« Dernières actualités » sur l'accueil, ou le fil
+   *  plein écran Actualité / Fait marquant). Token transmis s'il existe : le visiteur est
+   *  bloqué au-delà de la 1re page (`gated`). `cat` par défaut = actualite (accueil inchangé). */
+  loadLatest(page = 1, cat: FeedCat = 'actualite') {
+    const token = this.auth.token();
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    return this.http.get<LatestResponse>(`/api/veille/latest?page=${page}&cat=${cat}`, { headers });
   }
 
   openAdmin()  { this.adminOpen.set(true); }

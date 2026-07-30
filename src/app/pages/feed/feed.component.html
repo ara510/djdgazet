@@ -1,0 +1,178 @@
+<section class="bg-silver-50 min-h-[70vh] py-8">
+  <div class="max-w-2xl mx-auto px-4">
+
+    <!-- Titre -->
+    <div class="flex items-baseline gap-3 mb-6">
+      <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark">{{ title() }}</h1>
+      @if (total()) { <span class="text-sm font-semibold text-silver-500">{{ total() }}</span> }
+    </div>
+
+    @if (loading() && items().length === 0) {
+      <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+    } @else if (items().length === 0) {
+      <p class="text-silver-500 text-sm">{{ fr() ? 'Rien pour le moment.' : 'Nothing yet.' }}</p>
+    } @else {
+
+      <!-- Fil : une colonne, veilles en entier -->
+      <div class="flex flex-col gap-5">
+        @for (v of items(); track v.id) {
+          <article class="bg-white border border-silver-200 rounded-xl overflow-hidden shadow-sm">
+            <!-- Photos affichées EN ENTIER (pas de recadrage) ; clic = plein écran (coupures de journal) -->
+            @if (imagesOf(v).length === 1) {
+              <button type="button" (click)="openLightbox(imagesOf(v), 0)" [attr.aria-label]="fr() ? 'Agrandir la photo' : 'Enlarge photo'"
+                      class="group/ph relative block w-full cursor-zoom-in">
+                <img [src]="imagesOf(v)[0]" [alt]="heading(v)" loading="lazy"
+                     class="block w-full h-auto max-h-[85vh] object-contain bg-silver-100" />
+                <span class="absolute top-2 right-2 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 group-hover/ph:opacity-100 transition-opacity" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                </span>
+              </button>
+            } @else if (imagesOf(v).length > 1) {
+              <div class="relative bg-silver-100 overflow-hidden h-80 sm:h-96 cursor-zoom-in" (click)="openLightbox(imagesOf(v), 0)">
+                <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)" fit="contain" />
+              </div>
+            }
+
+            <div class="p-5 flex flex-col gap-3">
+              <!-- Types de source + réseaux + secteur + tags -->
+              <div class="flex flex-wrap items-center gap-1.5">
+                @for (t of typesOf(v); track t) {
+                  @if (t === 'social' && networksOf(v).length) {
+                    @for (n of networksOf(v); track n) {
+                      <span class="inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full text-white text-[10px] font-semibold" [style.background]="netColor(n)">
+                        <span class="w-3 h-3 inline-flex"><app-veille-icon [network]="n" /></span>{{ networkLabel(n) }}
+                      </span>
+                    }
+                  } @else {
+                    <span class="inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full text-white text-[10px] font-semibold" [style.background]="typeColor(t)">
+                      <span class="w-3 h-3 inline-flex"><app-veille-icon [type]="t" /></span>{{ typeLabel(t) }}
+                    </span>
+                  }
+                }
+                @if (v.sector) {
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide" [style.color]="secColor(v.sector)" [style.background]="secTint(v.sector)">{{ sectorLabel(v.sector) }}</span>
+                }
+                @for (tg of tagsOf(v); track tg) {
+                  <span class="px-2 py-0.5 rounded-full bg-gazety-dark/5 text-gazety-dark text-[10px] font-bold uppercase tracking-wide">{{ tagLabel(tg) }}</span>
+                }
+              </div>
+
+              <h2 class="font-display font-bold text-xl md:text-2xl text-gazety-dark leading-snug">{{ heading(v) }}</h2>
+
+              <!-- Sources + date -->
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-silver-500">
+                @if (sourcesOf(v).length) {
+                  <span class="inline-flex items-center gap-1 font-semibold text-silver-600">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    {{ sourcesOf(v).join(' · ') }}
+                  </span>
+                  <span class="text-silver-300">•</span>
+                }
+                @if (v.author) { <span>{{ v.author }}</span><span class="text-silver-300">•</span> }
+                <span>{{ formatDate(v.published_at) }}</span>
+              </div>
+
+              <!-- Texte intégral (formatage léger **gras** *italique* ==surlignage==) -->
+              @if (v.excerpt) {
+                <div class="text-[15px] text-silver-700 leading-relaxed whitespace-pre-line" [innerHTML]="richText(v.excerpt)"></div>
+              }
+
+              <!-- Vidéo éventuelle -->
+              @if (v.has_video && v.video) {
+                <a [href]="v.video" target="_blank" rel="noopener"
+                   class="self-start inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gazety-red px-3 py-1.5 rounded-full hover:bg-gazety-red/90 transition-colors">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  {{ fr() ? 'Voir la vidéo' : 'Watch video' }}
+                </a>
+              }
+
+              <!-- Liens sources (logo + petit numéro si plusieurs) -->
+              @if (urlsOf(v).length) {
+                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  @for (u of urlsOf(v); track u; let i = $index) {
+                    <a [href]="u" target="_blank" rel="noopener"
+                       [title]="(fr() ? 'Ouvrir la source' : 'Open source') + (urlsOf(v).length > 1 ? ' ' + (i + 1) : '')"
+                       [attr.aria-label]="(fr() ? 'Ouvrir la source' : 'Open source') + (urlsOf(v).length > 1 ? ' ' + (i + 1) : '')"
+                       class="relative inline-flex items-center justify-center w-8 h-8 rounded-md border border-silver-200 text-gazety-red hover:bg-gazety-red hover:text-white hover:border-gazety-red transition-colors">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      @if (urlsOf(v).length > 1) { <sup class="absolute top-0.5 right-1 text-[9px] font-bold leading-none">{{ i + 1 }}</sup> }
+                    </a>
+                  }
+                </div>
+              }
+
+              <!-- Médias réservés à la Dédiée (photo/liens retirés pour ce compte) -->
+              @if (v.media_locked) {
+                <p class="text-[11px] text-silver-400 italic">
+                  {{ fr() ? 'Photos et liens réservés à l’abonnement Dédiée.' : 'Photos and links reserved for the Dedicated plan.' }}
+                </p>
+              }
+            </div>
+          </article>
+        }
+      </div>
+
+      <!-- Bas de fil : mur d'inscription visiteur / chargement / fin -->
+      <div class="mt-6 text-center">
+        @if (gated()) {
+          <div class="rounded-lg border border-silver-200 bg-white p-5">
+            <p class="text-sm text-silver-600 mb-3">{{ fr() ? 'Créez un compte gratuit pour voir la suite.' : 'Create a free account to see more.' }}</p>
+            <button type="button" (click)="signup()"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gazety-red text-white text-sm font-semibold hover:bg-gazety-red/90 transition-colors">
+              {{ fr() ? 'Créer un compte' : 'Create account' }}
+            </button>
+          </div>
+        } @else if (loading()) {
+          <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+        } @else if (!hasMore()) {
+          <p class="text-silver-400 text-xs">{{ fr() ? 'Fin du fil.' : 'End of feed.' }}</p>
+        }
+      </div>
+    }
+
+    <!-- Sentinelle scroll infini (toujours présente en bas) -->
+    <div #sentinel class="h-px w-full"></div>
+  </div>
+</section>
+
+<!-- Bouton « retour en haut » (bas au centre, apparaît au défilement) -->
+@if (showTop()) {
+  <button type="button" (click)="scrollTop()" [attr.aria-label]="fr() ? 'Revenir en haut' : 'Back to top'"
+          class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[900] inline-flex items-center gap-1.5 pl-3 pr-4 py-2.5 rounded-full bg-gazety-dark text-white text-sm font-semibold shadow-lg hover:bg-gazety-dark/90 transition-colors animate-fade-in">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    {{ fr() ? 'Haut' : 'Top' }}
+  </button>
+}
+
+<!-- ── Visionneuse plein écran (coupures de journal : clic sur l'image = zoom taille réelle) ── -->
+@if (lightbox(); as lb) {
+  <div class="fixed inset-0 z-[9999] bg-black/90 overflow-auto overscroll-contain" (click)="closeLightbox()">
+    <div class="min-h-full flex items-center justify-center p-3 sm:p-6">
+      <img [src]="lb.images[lb.index]" [alt]="fr() ? 'Photo en plein écran' : 'Full-screen photo'" (click)="toggleZoom($event)"
+           [ngClass]="zoomed() ? 'max-w-none cursor-zoom-out' : 'max-w-full max-h-[92vh] object-contain cursor-zoom-in'" />
+    </div>
+
+    <!-- Fermer -->
+    <button type="button" (click)="closeLightbox()" [attr.aria-label]="fr() ? 'Fermer' : 'Close'"
+            class="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+
+    <!-- Indice zoom -->
+    <span class="fixed top-5 left-1/2 -translate-x-1/2 text-white/70 text-xs font-medium pointer-events-none">
+      {{ zoomed() ? (fr() ? 'Cliquez pour ajuster' : 'Click to fit') : (fr() ? 'Cliquez pour zoomer' : 'Click to zoom') }}
+    </span>
+
+    @if (lb.images.length > 1) {
+      <button type="button" (click)="lightboxPrev($event)" [attr.aria-label]="fr() ? 'Photo précédente' : 'Previous photo'"
+              class="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button type="button" (click)="lightboxNext($event)" [attr.aria-label]="fr() ? 'Photo suivante' : 'Next photo'"
+              class="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <span class="fixed bottom-4 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-white/10 text-white text-xs font-semibold">{{ lb.index + 1 }} / {{ lb.images.length }}</span>
+    }
+  </div>
+}

@@ -111,11 +111,17 @@
         <h2 class="vp-detail__title">{{ cardHeading(item) }}</h2>
         @if (item.author) { <p class="vp-detail__author">{{ fr ? 'Par' : 'By' }} {{ item.author }}</p> }
         @if (item.excerpt) { <p class="vp-detail__excerpt">{{ item.excerpt }}</p> }
-        @for (u of urlsOf(item); track u; let i = $index) {
-          <a class="vp-detail__link" [href]="u" target="_blank" rel="noopener">
-            {{ fr ? 'Lire la source' : 'Read source' }}@if (urlsOf(item).length > 1) { {{ i + 1 }} }
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-          </a>
+        @if (urlsOf(item).length) {
+          <div class="vp-detail__links" [attr.aria-label]="fr ? 'Sources' : 'Sources'">
+            @for (u of urlsOf(item); track u; let i = $index) {
+              <a class="vp-detail__srclink" [href]="u" target="_blank" rel="noopener"
+                 [title]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')"
+                 [attr.aria-label]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                @if (urlsOf(item).length > 1) { <sup class="vp-detail__srclink-num">{{ i + 1 }}</sup> }
+              </a>
+            }
+          </div>
         }
       </div>
     </div>

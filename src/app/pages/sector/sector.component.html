@@ -79,20 +79,35 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         @for (v of g.items; track v.id) {
         <article (click)="openVeille(v)"
-                 class="group cursor-pointer bg-white border border-silver-200 rounded-sm p-4 flex flex-col gap-2 h-48 overflow-hidden hover:border-gazety-red transition-colors">
-          <!-- Titre (en haut) — secteur en repli si la veille n'a pas de titre -->
-          <h3 class="font-display font-bold text-base text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors shrink-0">
-            {{ cardTitle(v) }}
-          </h3>
-
-          @if (v.excerpt) {
-            <p class="text-sm text-silver-600 leading-relaxed line-clamp-2 flex-1">{{ v.excerpt }}…</p>
-          } @else {
-            <span class="flex-1"></span>
+                 class="group cursor-pointer bg-white border border-silver-200 rounded-sm flex flex-col overflow-hidden hover:border-gazety-red transition-colors">
+          <!-- Photo (uniquement si la veille en a une) : aperçu, on clique pour lire en entier -->
+          @if (v.image) {
+            <div class="relative h-32 bg-silver-100 overflow-hidden shrink-0">
+              <img [src]="v.image" [alt]="cardTitle(v)" loading="lazy"
+                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              @if ((v.images_count ?? 0) > 1) {
+                <span class="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-sm bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  {{ v.images_count }}
+                </span>
+              }
+            </div>
           }
 
-          <!-- Sources (en bas) : types + réseaux colorés + nom de source -->
-          <div class="flex items-center gap-1.5 flex-wrap shrink-0">
+          <div class="p-4 flex flex-col gap-2 flex-1">
+            <!-- Titre — secteur en repli si la veille n'a pas de titre -->
+            <h3 class="font-display font-bold text-base text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors shrink-0">
+              {{ cardTitle(v) }}
+            </h3>
+
+            @if (v.excerpt) {
+              <p class="text-sm text-silver-600 leading-relaxed line-clamp-2 flex-1" [innerHTML]="richText(v.excerpt) + '…'"></p>
+            } @else {
+              <span class="flex-1"></span>
+            }
+
+            <!-- Sources (en bas) : types + réseaux colorés + nom de source -->
+            <div class="flex items-center gap-1.5 flex-wrap shrink-0">
             @for (t of typesOf(v); track t) {
               @if (t === 'social' && networksOf(v).length) {
                 @for (n of networksOf(v); track n) {
@@ -122,6 +137,7 @@
             } @else {
               <span class="text-[11px] font-semibold text-gazety-red opacity-0 group-hover:opacity-100 transition-opacity">{{ i18n.isFrench() ? 'Lire →' : 'Read →' }}</span>
             }
+            </div>
           </div>
         </article>
         }

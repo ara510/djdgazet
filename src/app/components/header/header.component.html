@@ -85,6 +85,20 @@
                   {{ i18n.isFrench() ? 'Veille' : 'Watch' }}
                 </button>
 
+                @if (auth.currentUser()?.plan === 'generale' && !auth.currentUser()?.is_admin) {
+                  <!-- Fils gratuits (plan Générale) : Actualité + Fait marquant, façon Facebook -->
+                  <a routerLink="/fil/actualite" (click)="closeActionsMenu()"
+                     class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m0 0h2a2 2 0 012 2v9a2 2 0 01-2 2h-2m0-13v13M7 8h6M7 12h4" /></svg>
+                    {{ i18n.isFrench() ? 'Actualité' : 'News' }}
+                  </a>
+                  <a routerLink="/fil/fait-marquant" (click)="closeActionsMenu()"
+                     class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    {{ i18n.isFrench() ? 'Fait marquant' : 'Key fact' }}
+                  </a>
+                }
+
                 @if (auth.currentUser()?.is_admin) {
                   <!-- Articles -->
                   <a routerLink="/gestion-articles" (click)="closeActionsMenu()"
@@ -115,6 +129,13 @@
                           class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
                     <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
                     {{ i18n.isFrench() ? 'Veilles de l\'accueil' : 'Home watch items' }}
+                  </button>
+
+                  <!-- Articles de l'accueil (À la une / mis en avant / masqués) -->
+                  <button type="button" (click)="openHomeArticles()"
+                          class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm font-semibold text-gazety-dark hover:bg-silver-100 transition-colors">
+                    <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m0 0h2a2 2 0 012 2v9a2 2 0 01-2 2h-2m0-13v13M7 8h6M7 12h4" /></svg>
+                    {{ i18n.isFrench() ? 'Articles de l\'accueil' : 'Home articles' }}
                   </button>
                 }
 
@@ -176,17 +197,6 @@
             </a>
           </li>
         }
-        @if (!auth.isLoggedIn()) {
-          <li>
-            <a
-              routerLink="/veille-publique"
-              routerLinkActive="text-gazety-red border-gazety-red"
-              class="inline-flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-gazety-red hover:opacity-80 transition-colors whitespace-nowrap"
-            >
-              {{ i18n.isFrench() ? 'Veille média' : 'Media watch' }}
-            </a>
-          </li>
-        }
       </ul>
     </div>
   </nav>
@@ -202,6 +212,11 @@
   <!-- Panneau admin des veilles de l'accueil (modale) -->
   @if (homeVeille.adminOpen()) {
     <app-home-veille-admin />
+  }
+
+  <!-- Panneau admin des articles de l'accueil (modale) -->
+  @if (homeArticles.adminOpen()) {
+    <app-home-articles-admin />
   }
 
   <!-- Mobile menu -->

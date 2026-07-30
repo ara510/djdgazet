@@ -18,7 +18,7 @@ import { ToastService } from '../../services/toast.service';
   template: `
     <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50" (click)="close()"></div>
-      <div class="relative w-full max-w-xl bg-white rounded-lg shadow-xl border border-silver-200 max-h-[90vh] overflow-y-auto">
+      <div class="relative w-full max-w-4xl bg-white rounded-lg shadow-xl border border-silver-200 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between px-5 py-4 border-b border-silver-200 sticky top-0 bg-white z-10">
           <h2 class="font-display font-bold text-lg text-gazety-dark">
             {{ fr ? 'Veilles de l’accueil' : 'Home watch items' }}
@@ -104,7 +104,7 @@ import { ToastService } from '../../services/toast.service';
             </div>
           }
 
-          <!-- Liste des candidates -->
+          <!-- Liste des candidates : 2 colonnes (Veille digitale / Presse · Radio · TV) -->
           <div>
             <span class="block text-xs font-semibold uppercase tracking-wide text-silver-500 mb-2">
               {{ fr ? 'Veilles disponibles (tous secteurs)' : 'Available items (any sector)' }}
@@ -114,25 +114,55 @@ import { ToastService } from '../../services/toast.service';
             } @else if (candidates().length === 0) {
               <p class="text-sm text-silver-500">{{ fr ? 'Aucune veille publiée pour le moment.' : 'No published item yet.' }}</p>
             } @else {
-              <div class="max-h-64 overflow-y-auto rounded border border-silver-200 divide-y divide-silver-100">
-                @for (c of candidates(); track c.id) {
-                  <label class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-silver-50">
-                    <input type="checkbox" [checked]="isSelected(c.id)" (change)="toggle(c.id)" class="h-4 w-4 accent-gazety-red cursor-pointer shrink-0" />
-                    @if (c.image) { <img [src]="c.image" alt="" class="w-10 h-10 rounded object-cover shrink-0" loading="lazy" /> }
-                    <span class="flex-1 min-w-0">
-                      <span class="block text-sm text-gazety-dark truncate">{{ titleOf(c) }}</span>
-                      <span class="flex flex-wrap items-center gap-1.5 mt-0.5">
-                        @for (l of labelsOf(c); track l) {
-                          <span class="px-1.5 py-0.5 rounded bg-gazety-dark/5 text-gazety-dark text-[10px] font-semibold uppercase tracking-wide">{{ l }}</span>
-                        }
-                        <span class="text-[11px] text-silver-500">{{ c.published_at | date:'dd/MM/yy' }}@if (c.pinned) { · {{ fr ? 'épinglée' : 'pinned' }} }</span>
-                      </span>
-                    </span>
-                  </label>
-                }
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Colonne 1 : Veille digitale (web + réseaux) -->
+                <div>
+                  <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-gazety-dark">{{ fr ? 'Veille digitale' : 'Digital watch' }}</span>
+                    <span class="text-[11px] text-silver-500">({{ digitalCandidates().length }})</span>
+                  </div>
+                  <div class="max-h-72 overflow-y-auto rounded border border-silver-200 divide-y divide-silver-100">
+                    @for (c of digitalCandidates(); track c.id) {
+                      <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: c }"></ng-container>
+                    } @empty {
+                      <p class="text-xs text-silver-400 px-3 py-3">{{ fr ? 'Aucune' : 'None' }}</p>
+                    }
+                  </div>
+                </div>
+                <!-- Colonne 2 : Presse · Radio · TV (tout sauf web/réseaux) -->
+                <div>
+                  <div class="flex items-center gap-1.5 mb-1.5">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-gazety-dark">{{ fr ? 'Presse · Radio · TV' : 'Press · Radio · TV' }}</span>
+                    <span class="text-[11px] text-silver-500">({{ traditionalCandidates().length }})</span>
+                  </div>
+                  <div class="max-h-72 overflow-y-auto rounded border border-silver-200 divide-y divide-silver-100">
+                    @for (c of traditionalCandidates(); track c.id) {
+                      <ng-container *ngTemplateOutlet="rowTpl; context: { $implicit: c }"></ng-container>
+                    } @empty {
+                      <p class="text-xs text-silver-400 px-3 py-3">{{ fr ? 'Aucune' : 'None' }}</p>
+                    }
+                  </div>
+                </div>
               </div>
             }
           </div>
+
+          <!-- Ligne candidate réutilisable (partagée par les 2 colonnes) -->
+          <ng-template #rowTpl let-c>
+            <label class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-silver-50">
+              <input type="checkbox" [checked]="isSelected(c.id)" (change)="toggle(c.id)" class="h-4 w-4 accent-gazety-red cursor-pointer shrink-0" />
+              @if (c.image) { <img [src]="c.image" alt="" class="w-10 h-10 rounded object-cover shrink-0" loading="lazy" /> }
+              <span class="flex-1 min-w-0">
+                <span class="block text-sm text-gazety-dark truncate">{{ titleOf(c) }}</span>
+                <span class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  @for (l of labelsOf(c); track l) {
+                    <span class="px-1.5 py-0.5 rounded bg-gazety-dark/5 text-gazety-dark text-[10px] font-semibold uppercase tracking-wide">{{ l }}</span>
+                  }
+                  <span class="text-[11px] text-silver-500">{{ c.published_at | date:'dd/MM/yy' }}@if (c.pinned) { · {{ fr ? 'épinglée' : 'pinned' }} }</span>
+                </span>
+              </span>
+            </label>
+          </ng-template>
         </div>
 
         <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-silver-200 sticky bottom-0 bg-white">
@@ -175,6 +205,15 @@ export class HomeVeilleAdminComponent implements OnInit {
     const map = new Map(this.candidates().map(c => [c.id, c]));
     return this.ids().map(id => map.get(id)).filter((c): c is HomeVeilleCandidate => !!c);
   });
+
+  /** Une veille est « digitale » si elle comporte un type web ou réseau social (veille en ligne).
+   *  Sinon → colonne « Presse · Radio · TV » (tout sauf les réseaux). */
+  private isDigital(c: HomeVeilleCandidate): boolean {
+    const t = c.source_types || [];
+    return t.includes('web') || t.includes('social');
+  }
+  readonly digitalCandidates     = computed(() => this.candidates().filter(c => this.isDigital(c)));
+  readonly traditionalCandidates = computed(() => this.candidates().filter(c => !this.isDigital(c)));
 
   ngOnInit() {
     this.svc.getSettings().subscribe({

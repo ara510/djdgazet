@@ -2,7 +2,6 @@ import { Routes } from '@angular/router';
 import { HomeComponent } from './pages/home/home.component';
 import { SubscriptionsComponent } from './pages/subscriptions/subscriptions.component';
 import { ArticleComponent } from './pages/article/article.component';
-import { VeilleShowcaseComponent } from './pages/veille-showcase/veille-showcase.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'Headlines — Actualités' },
@@ -11,11 +10,8 @@ export const routes: Routes = [
     component: SubscriptionsComponent,
     title: 'Abonnements — Headlines',
   },
-  {
-    path: 'veille-publique',
-    component: VeilleShowcaseComponent,
-    title: 'Veille — Headlines',
-  },
+  // Page veille publique retirée : la veille média se lit désormais sur l'accueil (modale au clic).
+  { path: 'veille-publique', redirectTo: '', pathMatch: 'full' },
   {
     path: 'profil',
     loadComponent: () =>
@@ -33,6 +29,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/sector/sector.component').then((m) => m.SectorComponent),
     title: 'Secteur — Headlines',
+  },
+  {
+    // Fil plein écran des catégories gratuites : /fil/actualite | /fil/fait-marquant
+    path: 'fil/:cat',
+    loadComponent: () =>
+      import('./pages/feed/feed.component').then((m) => m.FeedComponent),
+    title: 'Fil — Headlines',
   },
   {
     path: 'gestion-articles',

@@ -329,14 +329,23 @@
                       @for (s of a.sectors || []; track s) { <span class="dash-card__sector">{{ sectorLabel(s) }}</span> }
                     </div>
                   }
-                  @if (a.source || urlsOf(a).length) {
+                  @if (a.source) {
                     <p class="alert-card__source">
                       <span class="alert-card__source-label">Source</span>
-                      @if (a.source) { <span class="alert-card__source-name">{{ a.source }}</span> }
-                      @for (u of urlsOf(a); track u; let i = $index) {
-                        <a [href]="u" target="_blank" rel="noopener">{{ fr ? 'Lien' : 'Link' }}@if (urlsOf(a).length > 1) {&nbsp;{{ i + 1 }}}</a>
-                      }
+                      <span class="alert-card__source-name">{{ a.source }}</span>
                     </p>
+                  }
+                  @if (urlsOf(a).length) {
+                    <span class="dash-srclinks alert-card__srclinks">
+                      @for (u of urlsOf(a); track u; let i = $index) {
+                        <a class="dash-srclink" [href]="u" target="_blank" rel="noopener"
+                           [attr.title]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(a).length > 1 ? ' ' + (i + 1) : '')"
+                           [attr.aria-label]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(a).length > 1 ? ' ' + (i + 1) : '')">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                          @if (urlsOf(a).length > 1) { <sup class="dash-srclink-num">{{ i + 1 }}</sup> }
+                        </a>
+                      }
+                    </span>
                   }
                 </article>
               }
@@ -450,11 +459,17 @@
                 </div>
 
                 <div class="dash-card__foot">
-                  @for (u of urlsOf(item); track u; let i = $index) {
-                    <a class="dash-card__link" [href]="u" target="_blank" rel="noopener" (click)="$event.stopPropagation()">
-                      {{ fr ? 'Lire la source' : 'Read source' }}@if (urlsOf(item).length > 1) { <span class="dash-card__link-n">{{ i + 1 }}</span> }
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                    </a>
+                  @if (urlsOf(item).length) {
+                    <span class="dash-srclinks">
+                      @for (u of urlsOf(item); track u; let i = $index) {
+                        <a class="dash-srclink" [href]="u" target="_blank" rel="noopener" (click)="$event.stopPropagation()"
+                           [attr.title]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')"
+                           [attr.aria-label]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                          @if (urlsOf(item).length > 1) { <sup class="dash-srclink-num">{{ i + 1 }}</sup> }
+                        </a>
+                      }
+                    </span>
                   }
                   @if (isAdmin) {
                     <span class="dash-card__admin">
@@ -596,12 +611,16 @@
 
                   @if (urlsOf(item).length) {
                     <div class="feed-card__foot">
-                      @for (u of urlsOf(item); track u; let i = $index) {
-                        <a class="dash-detail__link" [href]="u" target="_blank" rel="noopener">
-                          {{ fr ? 'Lire la source' : 'Read source' }}@if (urlsOf(item).length > 1) { <span class="dash-card__link-n">{{ i + 1 }}</span> }
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                        </a>
-                      }
+                      <span class="dash-srclinks">
+                        @for (u of urlsOf(item); track u; let i = $index) {
+                          <a class="dash-srclink" [href]="u" target="_blank" rel="noopener"
+                             [attr.title]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')"
+                             [attr.aria-label]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            @if (urlsOf(item).length > 1) { <sup class="dash-srclink-num">{{ i + 1 }}</sup> }
+                          </a>
+                        }
+                      </span>
                     </div>
                   }
                 </article>
@@ -1254,11 +1273,17 @@
               {{ item.favorite ? (fr ? 'En favori' : 'Favorited') : (fr ? 'Ajouter aux favoris' : 'Add to favorites') }}
             </button>
           }
-          @for (u of urlsOf(item); track u; let i = $index) {
-            <a class="dash-detail__link" [href]="u" target="_blank" rel="noopener">
-              {{ fr ? 'Lire la source' : 'Read source' }}@if (urlsOf(item).length > 1) { <span class="dash-card__link-n">{{ i + 1 }}</span> }
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-            </a>
+          @if (urlsOf(item).length) {
+            <span class="dash-srclinks">
+              @for (u of urlsOf(item); track u; let i = $index) {
+                <a class="dash-srclink" [href]="u" target="_blank" rel="noopener"
+                   [attr.title]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')"
+                   [attr.aria-label]="(fr ? 'Ouvrir la source' : 'Open source') + (urlsOf(item).length > 1 ? ' ' + (i + 1) : '')">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  @if (urlsOf(item).length > 1) { <sup class="dash-srclink-num">{{ i + 1 }}</sup> }
+                </a>
+              }
+            </span>
           }
           @if (isAdmin) {
             <span class="dash-detail__admin">

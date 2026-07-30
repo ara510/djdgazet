@@ -55,6 +55,12 @@ export class ArticleService {
     return this.http.get<ArticleItem[]>(`/api/articles${q}`);
   }
 
+  /** Liste résolue pour l'accueil : « À la une » choisi par l'admin + grille (masqués exclus,
+   *  mis en avant en tête). Réglée via la modale « Articles de l'accueil ». */
+  loadHome() {
+    return this.http.get<{ hero: ArticleItem | null; items: ArticleItem[] }>('/api/articles/home');
+  }
+
   getOne(id: number | string) {
     return this.http.get<ArticleItem>(`/api/articles/${id}`, { headers: this.authHeaders() });
   }

@@ -8,6 +8,7 @@ import { AuthModalService } from '../../services/auth-modal.service';
 import { VeilleService } from '../../services/veille.service';
 import { ArticleService, ArticleItem } from '../../services/article.service';
 import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
+import { formatRecapText } from '../../services/rich-text';
 
 interface SectorVeille {
   id: number;
@@ -19,6 +20,8 @@ interface SectorVeille {
   social_network?: string | null;
   social_networks?: string[] | null;
   sectors?: string[] | null;
+  image?: string | null;
+  images_count?: number;
   published_at?: string;
   locked: boolean;
   tier: 'sectorielle' | 'dediee';
@@ -176,6 +179,9 @@ export class SectorComponent {
     div.innerHTML = html;
     return (div.textContent || '').replace(/\s+/g, ' ').trim().slice(0, len);
   }
+
+  /** Extrait avec formatage léger (**gras**, *italique*, ==surlignage==) → HTML pour [innerHTML]. */
+  richText(t?: string | null): string { return formatRecapText(t); }
 
   /** Titre affiché : le titre de la veille, sinon le libellé du secteur. */
   cardTitle(v: SectorVeille): string {

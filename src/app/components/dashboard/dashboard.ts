@@ -5,6 +5,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { TranslationService } from '../../services/translation.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { formatRecapText } from '../../services/rich-text';
 import { VeilleService, VeilleItem } from '../../services/veille.service';
 import { AlertService, AlertItem, AlertLevel } from '../../services/alert.service';
 import { AdminService, FeedbackItem, AdminUser } from '../../services/admin.service';
@@ -1267,13 +1268,7 @@ export class DashboardComponent implements OnDestroy {
   }
 
   /** Convertit les marqueurs (**gras**, *italique*, ==surligné==) en HTML (sanitizé par Angular à l'affichage). */
-  formatRecapText(text?: string | null): string {
-    if (!text) return '';
-    return text
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/==([^=]+)==/g, '<mark>$1</mark>');
-  }
+  formatRecapText(text?: string | null): string { return formatRecapText(text); }
 
   close() {
     this.closing.set(true);

@@ -206,8 +206,12 @@ db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL D
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
 // Admin = email du domaine de la marque (configurable via .env). Synchronise les comptes existants.
 const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour.com').toLowerCase();
+// Admins permanents par identifiant (comptes hors domaine) : re-promus à chaque boot ET
+// jamais rétrogradés par la synchro ci-dessous. Ajouter/retirer un identifiant ici.
+const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8'];
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE $1 AND is_admin = FALSE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
-db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
+db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(username) = ANY($1) AND is_admin = FALSE`, [BOOT_ADMIN_USERNAMES]).catch(() => {});
+db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND LOWER(username) <> ALL($2) AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN, BOOT_ADMIN_USERNAMES]).catch(() => {});
 db.query(`
   CREATE TABLE IF NOT EXISTS veille_items (
     id             SERIAL PRIMARY KEY,
@@ -1662,33 +1666,57 @@ async function readHomeVeilleSettings() {
 
 // Champs complets d'une veille pour l'affichage « en intégralité » sur l'accueil.
 const HOME_VEILLE_SELECT = `id, title, source, sources, source_type, source_types, social_network, social_networks,
-  sector, sectors, tags, tone, url, urls, excerpt, image, images, author,
+  sector, sectors, tags, tone, url, urls, excerpt, image, images, author, media_dediee, video,
   COALESCE(array_length(images, 1), 0) AS images_count, (video IS NOT NULL) AS has_video, published_at`;
 
-// Verrou teaser sur l'accueil : une veille rattachée à un secteur SANS être taguée
-// « Actualité » = contenu payant (Sectorielle/Dédiée) → on garde les métadonnées
-// (sources, types, secteur, image) mais on masque le corps (extrait tronqué) et les
-// liens. Les Actualité (même avec un secteur) restent gratuites, donc en entier.
-function homeLock(item) {
-  const hasSector   = Array.isArray(item.sectors) && item.sectors.length >= 1;
-  const isActualite = Array.isArray(item.tags) && item.tags.includes('actualite');
-  const locked = hasSector && !isActualite;
-  if (!locked) return { ...item, locked: false };
-  return {
-    ...item,
-    locked: true,
-    excerpt: (item.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 150),
-    url: null,
-    urls: null,
-    has_video: false,
-  };
+// Verrou teaser sur l'accueil. Une veille rattachée à un secteur = contenu payant :
+//  - Taguée « Actualité » → titre + résumé COMPLET restent gratuits (elle est faite pour
+//    être lue sur l'accueil), mais photos, liens et vidéo sont réservés aux abonnés du bon
+//    niveau (`media_locked`) : être « actualité » ne déverrouille QUE le texte, pas les médias.
+//  - Sans « Actualité » → teaser entièrement verrouillé (corps tronqué), médias masqués.
+// Dans les deux cas non couverts, on retire photo/liens/vidéo pour ne rien laisser fuir.
+// `viewer` = { isAdmin, level } : un admin, ou un abonné dont le plan couvre le secteur,
+// voit tout (locked=false, media_locked=false) → pas de redirection vers les abonnements.
+function homeLock(item, viewer = { isAdmin: false, level: 0 }) {
+  const hasSector = Array.isArray(item.sectors) && item.sectors.length >= 1;
+  // Catégories GRATUITES du plan Générale : « Actualité » ET « Fait marquant » (les deux sont
+  // classées « Catégories Générale » dans l'éditeur) → lisibles en entier par tout le monde.
+  const isFree   = Array.isArray(item.tags) && (item.tags.includes('actualite') || item.tags.includes('fait_marquant'));
+  const allowed  = sectorsForLevel(viewer.level);
+  const sectorOk = hasSector && item.sectors.some(s => allowed.includes(s));
+
+  // MÉDIAS (photo/liens/vidéo) : PUBLICS par défaut pour tout le monde (visiteur, Générale,
+  // abonnés). Réservés à la Dédiée UNIQUEMENT si l'admin a coché `media_dediee` sur la veille
+  // (même règle que la liste du tableau de bord). Le secteur seul ne verrouille PAS les médias.
+  const canMedia = viewer.isAdmin || viewer.level >= 2 || !item.media_dediee;
+  // TEXTE : une veille rattachée à un secteur SANS catégorie gratuite = teaser payant (corps
+  // tronqué). Actualité / Fait marquant (même sectorielles) restent lisibles en entier par tous.
+  const canText  = viewer.isAdmin || !hasSector || isFree || sectorOk;
+
+  const out = { ...item, locked: false, media_locked: !canMedia };
+  if (!canMedia) {
+    out.image = null; out.images = null; out.images_count = 0;
+    out.url = null; out.urls = null; out.video = null; out.has_video = false;
+  }
+  if (!canText) {
+    out.locked = true;
+    out.excerpt = (item.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 150);
+    out.url = null; out.urls = null; out.has_video = false; // teaser verrouillé : pas de liens/vidéo
+  }
+  return out;
 }
 
 // GET public : liste résolue des veilles Actualité + réglages d'affichage (échelle).
-app.get('/api/veille/home', async (req, res) => {
+app.get('/api/veille/home', optionalAuth, async (req, res) => {
   try {
     const cfg = await readHomeVeilleSettings();
     if (!cfg.enabled) return res.json({ enabled: false, scale: cfg.scale, items: [] });
+    // Spectateur : admin / niveau de plan → détermine l'accès aux teasers payants (pas de verrou à tort).
+    let viewer = { isAdmin: false, level: 0 };
+    if (req.user) {
+      const u = await db.query('SELECT plan, is_admin FROM users WHERE id = $1', [req.user.id]);
+      if (u.rows.length) viewer = { isAdmin: !!u.rows[0].is_admin, level: PLAN_LEVEL[u.rows[0].plan] ?? 0 };
+    }
     const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
 
     // Veilles explicitement choisies par l'admin (TOUS secteurs), dans l'ordre choisi.
@@ -1717,7 +1745,10 @@ app.get('/api/veille/home', async (req, res) => {
       items = [...picked, ...auto.rows.filter(r => !pickedIds.has(r.id))];
     }
     if (cfg.count > 0) items = items.slice(0, cfg.count);
-    res.json({ enabled: true, scale: cfg.scale, items: items.map(homeLock) });
+    // Visiteurs (non connectés) : aperçu limité à 6 actualités (lecture intégrale via la modale
+    // de l'accueil au clic ; pas d'accès à une page veille dédiée). Les connectés voient tout.
+    if (!req.user) items = items.slice(0, 6);
+    res.json({ enabled: true, scale: cfg.scale, items: items.map(it => homeLock(it, viewer)) });
   } catch (err) {
     console.error('Veille home error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1734,7 +1765,7 @@ app.get('/api/veille/home/settings', requireAuth, requireAdmin, async (req, res)
 app.get('/api/veille/home/candidates', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, title, excerpt, image, sector, sectors, tags, published_at, pinned FROM veille_items
+      `SELECT id, title, excerpt, image, sector, sectors, tags, source_types, published_at, pinned FROM veille_items
        WHERE deleted_at IS NULL AND status = 'published'
        ORDER BY pinned DESC, published_at DESC, id DESC LIMIT 300`
     );
@@ -1764,6 +1795,45 @@ app.put('/api/veille/home/settings', requireAuth, requireAdmin, async (req, res)
   } catch (err) { console.error('Home veille settings update error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
 });
 
+// ─── Fil « Dernières actualités » de l'accueil (liste compacte sous « Veille média ») ──
+// TOUTES les veilles taguées « Actualité », paginées. Les actualités sont gratuites
+// (homeLock les laisse ouvertes) → l'aperçu s'ouvre en entier dans la modale de l'accueil.
+// Visiteur : 1re page seulement ; au-delà → 403 `gated` (le front affiche le mur d'inscription).
+const LATEST_PAGE_SIZE = 10;
+app.get('/api/veille/latest', optionalAuth, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const isVisitor = !req.user;
+    if (isVisitor && page > 1) return res.status(403).json({ error: 'Compte requis pour la suite.', gated: true });
+
+    let viewer = { isAdmin: false, level: 0 };
+    if (req.user) {
+      const u = await db.query('SELECT plan, is_admin FROM users WHERE id = $1', [req.user.id]);
+      if (u.rows.length) viewer = { isAdmin: !!u.rows[0].is_admin, level: PLAN_LEVEL[u.rows[0].plan] ?? 0 };
+    }
+    // Catégorie du fil : « Actualité » (défaut) ou « Fait marquant » — les 2 catégories gratuites.
+    const cat = req.query.cat === 'fait_marquant' ? 'fait_marquant' : 'actualite';
+    const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
+    const actuWhere = `${baseWhere} AND tags && ARRAY[$1]::text[]`;
+    const totalQ = await db.query(`SELECT COUNT(*)::int AS n FROM veille_items WHERE ${actuWhere}`, [cat]);
+    const total = totalQ.rows[0]?.n ?? 0;
+    const { rows } = await db.query(
+      `SELECT ${HOME_VEILLE_SELECT} FROM veille_items WHERE ${actuWhere}
+       ORDER BY pinned DESC, published_at DESC, id DESC LIMIT $2 OFFSET $3`,
+      [cat, LATEST_PAGE_SIZE, (page - 1) * LATEST_PAGE_SIZE]
+    );
+    const hasMore = page * LATEST_PAGE_SIZE < total;
+    res.json({
+      items: rows.map(it => homeLock(it, viewer)),
+      cat, page, pageSize: LATEST_PAGE_SIZE, total, hasMore,
+      gated: isVisitor && hasMore, // le visiteur ne peut pas aller page 2
+    });
+  } catch (err) {
+    console.error('Veille latest error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // GET /api/veille/sector/:sector — veilles d'un secteur, avec gating selon le visiteur :
 //   visiteur (sans compte) + abonné Générale → titre + extrait court (verrouillé) ;
 //   Sectorielle / Dédiée / admin → contenu complet.
@@ -1778,7 +1848,8 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
     }
     const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
     const { rows } = await db.query(
-      `SELECT id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, excerpt, published_at
+      `SELECT id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, excerpt,
+              image, COALESCE(array_length(images, 1), 0) AS images_count, media_dediee, published_at
        FROM veille_items
        WHERE ${baseWhere} AND $1 = ANY(sectors)
        ORDER BY pinned DESC, published_at DESC, id DESC LIMIT 60`,
@@ -1794,22 +1865,28 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
     // Aperçu compact UNIFORME pour tous (titre + extrait court + sources). `locked` =
     // accès interdit au visiteur (→ inscription) ou au gratuit (→ abonnement),
     // sauf veille déjà débloquée ou quota découverte encore disponible.
-    const map = r => ({
-      id: r.id,
-      title: r.title,
-      excerpt: (r.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 150),
-      source: r.source,
-      sources: r.sources,
-      source_type: r.source_type,
-      source_types: r.source_types,
-      social_network: r.social_network,
-      social_networks: r.social_networks,
-      sector: r.sector,
-      sectors: r.sectors,
-      published_at: r.published_at,
-      locked: !(isAdmin || level >= required || (quota && (quota.readIds.includes(r.id) || quota.remaining > 0))),
-      tier,
-    });
+    const map = r => {
+      // Vignette d'aperçu : masquée si le média est réservé à la Dédiée et que l'utilisateur n'y a pas droit.
+      const canMedia = isAdmin || level >= 2 || !r.media_dediee;
+      return {
+        id: r.id,
+        title: r.title,
+        excerpt: (r.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 150),
+        source: r.source,
+        sources: r.sources,
+        source_type: r.source_type,
+        source_types: r.source_types,
+        social_network: r.social_network,
+        social_networks: r.social_networks,
+        sector: r.sector,
+        sectors: r.sectors,
+        image: canMedia ? (r.image || null) : null,
+        images_count: canMedia ? Number(r.images_count || 0) : 0,
+        published_at: r.published_at,
+        locked: !(isAdmin || level >= required || (quota && (quota.readIds.includes(r.id) || quota.remaining > 0))),
+        tier,
+      };
+    };
 
     // Étalement temporel, calé sur la veille la plus récente du secteur (bouge quand on
     // ajoute une veille) : 3 récentes, 3 d'il y a ~3 jours, 3 d'il y a ~5 jours.
@@ -2307,6 +2384,86 @@ app.get('/api/articles', async (req, res) => {
       `SELECT ${ARTICLE_FIELDS} FROM articles WHERE ${where} ORDER BY published_at DESC, id DESC LIMIT 100`, params);
     res.json(rows);
   } catch (err) { console.error('Article list error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// ─── Articles de l'accueil (piloté par l'admin) ───────────────────────────────
+// `home_articles` dans app_settings : { hero, featured[], hidden[] }
+//   hero     = article du grand emplacement « À la une » (null = le plus récent)
+//   featured = articles remontés en tête de la grille, dans cet ordre
+//   hidden   = articles retirés de l'accueil (restent accessibles par leur URL)
+// ⚠️ Ces routes DOIVENT rester déclarées avant `/api/articles/:id` (sinon :id = "home").
+const HOME_ARTICLES_KEY = 'home_articles';
+
+async function readHomeArticlesSettings() {
+  const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [HOME_ARTICLES_KEY]);
+  const v = rows[0]?.value || {};
+  const ints = (a) => Array.isArray(a) ? [...new Set(a.map(Number).filter(Number.isInteger))].slice(0, 100) : [];
+  return {
+    hero:     Number.isInteger(v.hero) ? v.hero : null,
+    featured: ints(v.featured),
+    hidden:   ints(v.hidden),
+  };
+}
+
+// GET public : liste résolue de l'accueil { hero, items } (masqués exclus, mis en avant en tête).
+app.get('/api/articles/home', async (req, res) => {
+  try {
+    const cfg = await readHomeArticlesSettings();
+    const { rows } = await db.query(
+      `SELECT ${ARTICLE_FIELDS} FROM articles WHERE deleted_at IS NULL
+       ORDER BY published_at DESC, id DESC LIMIT 100`);
+    const hidden = new Set(cfg.hidden);
+    const visible = rows.filter(a => !hidden.has(a.id));
+    // À la une : le choix de l'admin s'il est encore visible, sinon le plus récent.
+    let hero = cfg.hero ? (visible.find(a => a.id === cfg.hero) || null) : null;
+    if (!hero) hero = visible[0] || null;
+    let rest = visible.filter(a => !hero || a.id !== hero.id);
+    // Mis en avant en tête, dans l'ordre choisi ; puis le reste en chronologique.
+    if (cfg.featured.length) {
+      const map = new Map(rest.map(a => [a.id, a]));
+      const feat = cfg.featured.map(id => map.get(id)).filter(Boolean);
+      const featIds = new Set(feat.map(a => a.id));
+      rest = [...feat, ...rest.filter(a => !featIds.has(a.id))];
+    }
+    res.json({ hero, items: rest });
+  } catch (err) { console.error('Articles home error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// GET admin : réglages actuels.
+app.get('/api/articles/home/settings', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json(await readHomeArticlesSettings()); }
+  catch (err) { console.error('Articles home settings get error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// GET admin : articles candidats (pour choisir À la une / mis en avant / masqués).
+app.get('/api/articles/home/candidates', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, title, sector, author, image, published_at, views FROM articles
+       WHERE deleted_at IS NULL ORDER BY published_at DESC, id DESC LIMIT 300`);
+    res.json(rows);
+  } catch (err) { console.error('Articles home candidates error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// PUT admin : enregistre les réglages.
+app.put('/api/articles/home/settings', requireAuth, requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  const ints = (a) => Array.isArray(a) ? [...new Set(a.map(Number).filter(Number.isInteger))].slice(0, 100) : [];
+  const value = {
+    hero:     Number.isInteger(b.hero) ? b.hero : null,
+    featured: ints(b.featured),
+    hidden:   ints(b.hidden),
+  };
+  try {
+    await db.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+      [HOME_ARTICLES_KEY, JSON.stringify(value)]
+    );
+    logActivity(req, 'home_articles.update',
+      `une:${value.hero ?? 'auto'} avant:${value.featured.length} masqués:${value.hidden.length}`);
+    res.json(value);
+  } catch (err) { console.error('Articles home settings update error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
 });
 
 // GET /api/articles/:id (public, auth optionnelle) — détail + incrémente les vues + état favori

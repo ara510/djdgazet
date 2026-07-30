@@ -910,6 +910,20 @@
   line-height: 1;
 }
 
+// Sources = icônes de lien (chip carré). Exposant = index quand il y a plusieurs liens.
+.dash-srclinks { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.dash-srclink {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1px solid var(--color-border); background: #fff; color: var(--color-accent);
+  text-decoration: none; transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.18s;
+  &:hover { background: var(--color-accent); border-color: var(--color-accent); color: #fff; transform: translateY(-1px); }
+}
+.dash-srclink-num {
+  position: absolute; top: 3px; right: 4px;
+  font-size: 0.54rem; font-weight: 700; line-height: 1;
+}
+
 // ─── Épingler (toggle éditeur) ────────────────────────────────────────────────
 .dash-pin-toggle {
   display: flex;
@@ -2474,6 +2488,7 @@
     color: #9A8E7E;
     margin-right: 0.35rem;
   }
+  &__srclinks { margin-top: 0.5rem; }
 }
 
 /* Bandeau d'avertissement « envoi immédiat » dans l'éditeur d'alerte */

@@ -155,10 +155,18 @@
   &__title { font-family: 'Poppins', var(--font-body); font-size: 1.6rem; font-weight: 600; line-height: 1.25; color: var(--color-ink); margin: 0; }
   &__author { font-size: 0.78rem; color: var(--color-ink-muted); margin: 0; }
   &__excerpt { font-size: 0.92rem; line-height: 1.7; color: var(--color-ink); opacity: 0.88; margin: 0; text-align: justify; hyphens: auto; white-space: pre-line; }
-  &__link {
-    display: inline-flex; align-items: center; gap: 0.4rem; align-self: flex-start;
-    font-size: 0.8rem; letter-spacing: 0.04em; color: var(--color-accent); text-decoration: none; font-weight: 500;
-    &:hover { text-decoration: underline; }
+  // Sources = icônes de lien (chip carré). Exposant = index quand il y en a plusieurs.
+  &__links { display: flex; flex-wrap: wrap; gap: 0.5rem; align-self: flex-start; }
+  &__srclink {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 9px;
+    border: 1px solid var(--color-border); background: #fff; color: var(--color-accent);
+    text-decoration: none; transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.18s;
+    &:hover { background: var(--color-accent); border-color: var(--color-accent); color: #fff; transform: translateY(-1px); }
+  }
+  &__srclink-num {
+    position: absolute; top: 4px; right: 5px;
+    font-size: 0.56rem; font-weight: 700; line-height: 1;
   }
 }
 

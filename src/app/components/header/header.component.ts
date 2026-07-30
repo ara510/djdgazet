@@ -6,14 +6,16 @@ import { AuthService } from '../../services/auth.service';
 import { VeilleService } from '../../services/veille.service';
 import { MarqueeService } from '../../services/marquee.service';
 import { HomeVeilleService } from '../../services/home-veille.service';
+import { HomeArticlesService } from '../../services/home-articles.service';
 import { MarqueeBarComponent } from '../marquee-bar/marquee-bar.component';
 import { MarqueeAdminComponent } from '../marquee-admin/marquee-admin.component';
 import { HomeVeilleAdminComponent } from '../home-veille-admin/home-veille-admin.component';
+import { HomeArticlesAdminComponent } from '../home-articles-admin/home-articles-admin.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, MarqueeBarComponent, MarqueeAdminComponent, HomeVeilleAdminComponent],
+  imports: [CommonModule, RouterLink, RouterLinkActive, MarqueeBarComponent, MarqueeAdminComponent, HomeVeilleAdminComponent, HomeArticlesAdminComponent],
   templateUrl: './header.component.html',
 })
 export class HeaderComponent {
@@ -22,6 +24,7 @@ export class HeaderComponent {
   protected readonly veille = inject(VeilleService);
   protected readonly marquee = inject(MarqueeService);
   protected readonly homeVeille = inject(HomeVeilleService);
+  protected readonly homeArticles = inject(HomeArticlesService);
   private readonly router = inject(Router);
 
   @Output() openAuth = new EventEmitter<'login' | 'signup'>();
@@ -51,6 +54,11 @@ export class HeaderComponent {
   openHomeVeille() {
     this.closeActionsMenu();
     this.homeVeille.openAdmin();
+  }
+
+  openHomeArticles() {
+    this.closeActionsMenu();
+    this.homeArticles.openAdmin();
   }
 
   doLogout() {
