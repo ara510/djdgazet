@@ -12,6 +12,10 @@
   </header>
 
   <nav class="admin__tabs" aria-label="Administration">
+    <button class="admin__tab" [class.admin__tab--active]="tab() === 'stats'" (click)="setTab('stats')" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      {{ fr ? 'Statistiques' : 'Statistics' }}
+    </button>
     <button class="admin__tab" [class.admin__tab--active]="tab() === 'users'" (click)="setTab('users')" type="button">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       {{ fr ? 'Utilisateurs' : 'Users' }}
@@ -32,6 +36,91 @@
   </nav>
 
   <div class="admin__body">
+
+    <!-- ══ Statistiques ══ -->
+    @if (tab() === 'stats') {
+      @if (admin.stats(); as s) {
+
+        <!-- 4 tuiles KPI (icône + grand chiffre) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <!-- Veille presse -->
+          <div class="rounded-xl border border-silver-200 bg-white p-4 flex flex-col gap-2 shadow-sm">
+            <span class="w-11 h-11 rounded-full inline-flex items-center justify-center" style="color:#2e8b6b;background:#2e8b6b1a">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8Z"/></svg>
+            </span>
+            <span class="text-3xl font-black text-gazety-dark leading-none">{{ s.veille.presse }}</span>
+            <span class="text-[11px] font-bold uppercase tracking-wide text-silver-500">{{ fr ? 'Veille presse' : 'Press watch' }}</span>
+          </div>
+          <!-- Veille digitale -->
+          <div class="rounded-xl border border-silver-200 bg-white p-4 flex flex-col gap-2 shadow-sm">
+            <span class="w-11 h-11 rounded-full inline-flex items-center justify-center" style="color:#2f6fb0;background:#2f6fb01a">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </span>
+            <span class="text-3xl font-black text-gazety-dark leading-none">{{ s.veille.digital }}</span>
+            <span class="text-[11px] font-bold uppercase tracking-wide text-silver-500">{{ fr ? 'Veille digitale' : 'Digital watch' }}</span>
+          </div>
+          <!-- Articles -->
+          <div class="rounded-xl border border-silver-200 bg-white p-4 flex flex-col gap-2 shadow-sm">
+            <span class="w-11 h-11 rounded-full inline-flex items-center justify-center" style="color:#c0563b;background:#c0563b1a">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </span>
+            <span class="text-3xl font-black text-gazety-dark leading-none">{{ s.articles.total }}</span>
+            <span class="text-[11px] font-bold uppercase tracking-wide text-silver-500">{{ fr ? 'Articles' : 'Articles' }}</span>
+          </div>
+          <!-- Utilisateurs -->
+          <div class="rounded-xl border border-silver-200 bg-white p-4 flex flex-col gap-2 shadow-sm">
+            <span class="w-11 h-11 rounded-full inline-flex items-center justify-center" style="color:#7d5ba6;background:#7d5ba61a">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <span class="text-3xl font-black text-gazety-dark leading-none">{{ s.users.total }}</span>
+            <span class="text-[11px] font-bold uppercase tracking-wide text-silver-500">{{ fr ? 'Utilisateurs' : 'Users' }}</span>
+          </div>
+        </div>
+
+        <!-- Répartition des veilles : barre presse / digitale -->
+        <div class="rounded-xl border border-silver-200 bg-white p-4 mb-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="text-[11px] font-bold uppercase tracking-wide text-silver-500">{{ fr ? 'Répartition des veilles' : 'Watch split' }}</span>
+            <span class="text-xs text-silver-500">{{ s.veille.presse + s.veille.digital }} {{ fr ? 'au total' : 'total' }}</span>
+          </div>
+          <div class="flex h-3.5 rounded-full overflow-hidden bg-silver-100 gap-0.5">
+            <div class="h-full min-w-[2px]" [style.flex-basis.%]="pct(s.veille.presse, s.veille.presse + s.veille.digital)" style="background:#2e8b6b"></div>
+            <div class="h-full min-w-[2px]" [style.flex-basis.%]="pct(s.veille.digital, s.veille.presse + s.veille.digital)" style="background:#2f6fb0"></div>
+          </div>
+          <div class="flex flex-wrap gap-x-6 gap-y-1.5 mt-3 text-xs">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-sm" style="background:#2e8b6b"></span>
+              <span class="text-silver-600">{{ fr ? 'Presse · Radio · TV' : 'Press · Radio · TV' }}</span>
+              <strong class="text-gazety-dark">{{ s.veille.presse }}</strong>
+              <span class="text-silver-400">({{ pct(s.veille.presse, s.veille.presse + s.veille.digital) }} %)</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-sm" style="background:#2f6fb0"></span>
+              <span class="text-silver-600">{{ fr ? 'Digitale (web · réseaux)' : 'Digital (web · social)' }}</span>
+              <strong class="text-gazety-dark">{{ s.veille.digital }}</strong>
+              <span class="text-silver-400">({{ pct(s.veille.digital, s.veille.presse + s.veille.digital) }} %)</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Abonnements (répartition des comptes non-admin) -->
+        @if (s.users.byPlan.length) {
+          <div class="rounded-xl border border-silver-200 bg-white p-4 shadow-sm">
+            <span class="block text-[11px] font-bold uppercase tracking-wide text-silver-500 mb-2.5">{{ fr ? 'Abonnements' : 'Subscriptions' }}</span>
+            <div class="flex flex-wrap gap-2">
+              @for (p of s.users.byPlan; track p.plan) {
+                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-silver-200 bg-silver-50">
+                  <span class="text-sm font-black text-gazety-dark">{{ p.count }}</span>
+                  <span class="text-xs font-semibold text-silver-600 capitalize">{{ p.plan }}</span>
+                </span>
+              }
+            </div>
+          </div>
+        }
+      } @else {
+        <p class="dash__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+      }
+    }
 
     <!-- ══ Utilisateurs ══ -->
     @if (tab() === 'users') {

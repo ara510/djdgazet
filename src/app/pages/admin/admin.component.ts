@@ -8,7 +8,7 @@ import { ToastService } from '../../services/toast.service';
 import { AdminService, FeedbackItem, AdminUser } from '../../services/admin.service';
 import { ChatService, ChatConversation, ChatMessage } from '../../services/chat.service';
 
-type AdminTab = 'users' | 'feedback' | 'messages' | 'activity';
+type AdminTab = 'stats' | 'users' | 'feedback' | 'messages' | 'activity';
 interface Option { value: string; fr: string; en: string; }
 
 @Component({
@@ -30,7 +30,7 @@ export class AdminComponent implements OnDestroy {
   t(key: string): string { return this.lang.t(key); }
 
   // Onglet actif de l'espace Administration.
-  tab = signal<AdminTab>('users');
+  tab = signal<AdminTab>('stats');
 
   // ── Messagerie (chat support) ──────────────────────────────────────────────
   conversations = signal<ChatConversation[]>([]);
@@ -52,8 +52,8 @@ export class AdminComponent implements OnDestroy {
       if (u && !u.is_admin) this.router.navigate(['/']);
     });
 
-    // Onglet par défaut : Utilisateurs.
-    this.admin.loadUsers();
+    // Onglet par défaut : Statistiques (vue d'ensemble).
+    this.admin.loadStats();
     // Badge de messagerie tenu à jour tant que la page est ouverte.
     this.loadConversations(true);
     this.convPoll = setInterval(() => this.loadConversations(true), 10_000);
@@ -64,9 +64,13 @@ export class AdminComponent implements OnDestroy {
     clearInterval(this.threadPoll);
   }
 
+  /** Pourcentage entier d'une part sur un total (0 si total nul). */
+  pct(part: number, total: number): number { return total > 0 ? Math.round((part / total) * 100) : 0; }
+
   setTab(tab: AdminTab) {
     this.tab.set(tab);
     if (tab !== 'messages') { this.selectedConv.set(null); this.stopThreadPoll(); }
+    if (tab === 'stats')    this.admin.loadStats();
     if (tab === 'users')    this.admin.loadUsers();
     if (tab === 'feedback') this.admin.loadFeedback();
     if (tab === 'messages') this.loadConversations();

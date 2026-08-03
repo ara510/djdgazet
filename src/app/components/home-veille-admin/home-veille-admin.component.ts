@@ -109,6 +109,21 @@ import { ToastService } from '../../services/toast.service';
             <span class="block text-xs font-semibold uppercase tracking-wide text-silver-500 mb-2">
               {{ fr ? 'Veilles disponibles (tous secteurs)' : 'Available items (any sector)' }}
             </span>
+            <!-- Recherche par titre (filtre les 2 colonnes) -->
+            <div class="relative mb-3">
+              <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-silver-400 pointer-events-none">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)"
+                     [placeholder]="fr ? 'Rechercher par titre…' : 'Search by title…'"
+                     class="w-full rounded border border-silver-300 pl-8 pr-8 py-1.5 text-sm text-gazety-dark focus:border-gazety-dark focus:outline-none" />
+              @if (search()) {
+                <button type="button" (click)="search.set('')" [attr.aria-label]="fr ? 'Effacer' : 'Clear'"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-silver-400 hover:text-gazety-dark">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              }
+            </div>
             @if (loading()) {
               <p class="text-sm text-silver-500">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
             } @else if (candidates().length === 0) {
@@ -212,8 +227,14 @@ export class HomeVeilleAdminComponent implements OnInit {
     const t = c.source_types || [];
     return t.includes('web') || t.includes('social');
   }
-  readonly digitalCandidates     = computed(() => this.candidates().filter(c => this.isDigital(c)));
-  readonly traditionalCandidates = computed(() => this.candidates().filter(c => !this.isDigital(c)));
+  /** Recherche par titre (filtre les 2 colonnes). */
+  readonly search = signal('');
+  private matches(c: HomeVeilleCandidate): boolean {
+    const q = this.search().trim().toLowerCase();
+    return !q || (c.title || '').toLowerCase().includes(q);
+  }
+  readonly digitalCandidates     = computed(() => this.candidates().filter(c => this.isDigital(c) && this.matches(c)));
+  readonly traditionalCandidates = computed(() => this.candidates().filter(c => !this.isDigital(c) && this.matches(c)));
 
   ngOnInit() {
     this.svc.getSettings().subscribe({

@@ -965,8 +965,15 @@ app.patch('/api/users/:id/plan', requireAuth, requireAdmin, async (req, res) => 
 // ─── GET /api/stats — statistiques (admin DJD) ────────────────────────────────
 app.get('/api/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const [veille, byStatus, byType, bySector, byMonth, users, byPlan, feedback, byCat] = await Promise.all([
+    const [veille, veilleSplit, articlesCount, byStatus, byType, bySector, byMonth, users, byPlan, feedback, byCat] = await Promise.all([
       db.query(`SELECT COUNT(*)::int AS total FROM veille_items`),
+      // Presse/Digital : « digitale » = au moins un type web ou réseau social ; « presse » = le reste
+      // (presse/radio/tv/institution, ou sans type). Corbeille exclue.
+      db.query(`SELECT
+                  COUNT(*) FILTER (WHERE source_types && ARRAY['web','social']::text[])::int AS digital,
+                  COUNT(*) FILTER (WHERE source_types IS NULL OR NOT (source_types && ARRAY['web','social']::text[]))::int AS presse
+                FROM veille_items WHERE deleted_at IS NULL`),
+      db.query(`SELECT COUNT(*)::int AS total FROM articles WHERE deleted_at IS NULL`),
       db.query(`SELECT status, COUNT(*)::int AS count FROM veille_items GROUP BY status`),
       db.query(`SELECT source_type, COUNT(*)::int AS count FROM veille_items GROUP BY source_type ORDER BY count DESC`),
       db.query(`SELECT sector, COUNT(*)::int AS count FROM veille_items WHERE sector IS NOT NULL GROUP BY sector ORDER BY count DESC`),
@@ -988,10 +995,13 @@ app.get('/api/stats', requireAuth, requireAdmin, async (req, res) => {
         total:     veille.rows[0].total,
         published: statusMap['published'] || 0,
         draft:     statusMap['draft'] || 0,
+        digital:   veilleSplit.rows[0].digital,
+        presse:    veilleSplit.rows[0].presse,
         byType:    byType.rows,
         bySector:  bySector.rows,
         byMonth:   byMonth.rows.reverse(),
       },
+      articles: { total: articlesCount.rows[0].total },
       users: {
         total:    users.rows[0].total,
         admins:   users.rows[0].admins,
@@ -1813,14 +1823,18 @@ app.get('/api/veille/latest', optionalAuth, async (req, res) => {
     }
     // Catégorie du fil : « Actualité » (défaut) ou « Fait marquant » — les 2 catégories gratuites.
     const cat = req.query.cat === 'fait_marquant' ? 'fait_marquant' : 'actualite';
+    // Recherche par titre (facultative) — appliquée à TOUT le fil, pas seulement au chargé.
+    const q = (req.query.q || '').toString().trim().slice(0, 100);
     const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
-    const actuWhere = `${baseWhere} AND tags && ARRAY[$1]::text[]`;
-    const totalQ = await db.query(`SELECT COUNT(*)::int AS n FROM veille_items WHERE ${actuWhere}`, [cat]);
+    const p = [cat];
+    let actuWhere = `${baseWhere} AND tags && ARRAY[$1]::text[]`;
+    if (q) { p.push(`%${q}%`); actuWhere += ` AND title ILIKE $${p.length}`; }
+    const totalQ = await db.query(`SELECT COUNT(*)::int AS n FROM veille_items WHERE ${actuWhere}`, p);
     const total = totalQ.rows[0]?.n ?? 0;
     const { rows } = await db.query(
       `SELECT ${HOME_VEILLE_SELECT} FROM veille_items WHERE ${actuWhere}
-       ORDER BY pinned DESC, published_at DESC, id DESC LIMIT $2 OFFSET $3`,
-      [cat, LATEST_PAGE_SIZE, (page - 1) * LATEST_PAGE_SIZE]
+       ORDER BY pinned DESC, published_at DESC, id DESC LIMIT $${p.length + 1} OFFSET $${p.length + 2}`,
+      [...p, LATEST_PAGE_SIZE, (page - 1) * LATEST_PAGE_SIZE]
     );
     const hasMore = page * LATEST_PAGE_SIZE < total;
     res.json({

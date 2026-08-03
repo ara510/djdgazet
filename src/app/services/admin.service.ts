@@ -25,10 +25,12 @@ export interface ActivityEntry {
 export interface Stats {
   veille: {
     total: number; published: number; draft: number;
+    digital: number; presse: number;
     byType: { source_type: string; count: number }[];
     bySector: { sector: string; count: number }[];
     byMonth: { month: string; count: number }[];
   };
+  articles: { total: number };
   users: {
     total: number; admins: number; verified: number; disabled: number;
     byPlan: { plan: string; count: number }[];

@@ -1,5 +1,6 @@
 import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, HostListener, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
@@ -19,7 +20,7 @@ import { formatRecapText } from '../../services/rich-text';
 @Component({
   selector: 'app-feed',
   standalone: true,
-  imports: [CommonModule, VeilleIconComponent, ImageCarouselComponent],
+  imports: [CommonModule, FormsModule, VeilleIconComponent, ImageCarouselComponent],
   templateUrl: './feed.component.html',
 })
 export class FeedComponent implements AfterViewInit, OnDestroy {
@@ -33,6 +34,7 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
   readonly loggedIn = computed(() => this.auth.isLoggedIn());
 
   readonly cat      = signal<FeedCat>('actualite');
+  readonly search   = signal('');
   readonly items    = signal<VeilleItem[]>([]);
   readonly loading  = signal(true);
   readonly page     = signal(1);
@@ -53,6 +55,7 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
     this.route.paramMap.subscribe(p => {
       const raw = (p.get('cat') || 'actualite').replace('-', '_');
       this.cat.set(raw === 'fait_marquant' ? 'fait_marquant' : 'actualite');
+      this.search.set(''); // chaque fil démarre sans filtre
       this.reset();
     });
     // Le contenu déverrouillé dépend du token → recharge à la connexion/déconnexion.
@@ -67,7 +70,7 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
     }, { rootMargin: '400px' });
     if (this.sentinel) this.observer.observe(this.sentinel.nativeElement);
   }
-  ngOnDestroy() { this.observer?.disconnect(); document.body.style.overflow = ''; }
+  ngOnDestroy() { this.observer?.disconnect(); clearTimeout(this.searchTimer); document.body.style.overflow = ''; }
 
   // ── Visionneuse plein écran (coupures de journal : zoom pour lire le texte) ──
   readonly lightbox = signal<{ images: string[]; index: number } | null>(null);
@@ -93,9 +96,18 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
     this.load(1);
   }
 
+  // ── Recherche par titre (débounce, filtrée côté serveur sur tout le fil) ──
+  private searchTimer?: ReturnType<typeof setTimeout>;
+  onSearch(value: string) {
+    this.search.set(value);
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.reset(), 350);
+  }
+  clearSearch() { clearTimeout(this.searchTimer); this.search.set(''); this.reset(); }
+
   private load(page: number) {
     this.loading.set(true);
-    this.homeVeille.loadLatest(page, this.cat()).subscribe({
+    this.homeVeille.loadLatest(page, this.cat(), this.search().trim()).subscribe({
       next: r => {
         this.items.update(list => page === 1 ? (r.items ?? []) : [...list, ...(r.items ?? [])]);
         this.page.set(r.page ?? page);

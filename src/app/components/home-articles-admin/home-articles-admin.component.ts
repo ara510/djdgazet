@@ -77,8 +77,24 @@ import { ToastService } from '../../services/toast.service';
                 </span>
               </div>
 
+              <!-- Recherche par titre -->
+              <div class="relative mb-2">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-silver-400 pointer-events-none">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </span>
+                <input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)"
+                       [placeholder]="fr ? 'Rechercher par titre…' : 'Search by title…'"
+                       class="w-full rounded border border-silver-300 pl-8 pr-8 py-1.5 text-sm text-gazety-dark focus:border-gazety-dark focus:outline-none" />
+                @if (search()) {
+                  <button type="button" (click)="search.set('')" [attr.aria-label]="fr ? 'Effacer' : 'Clear'"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 text-silver-400 hover:text-gazety-dark">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                }
+              </div>
+
               <ul class="divide-y divide-silver-100 border border-silver-200 rounded">
-                @for (a of candidates(); track a.id) {
+                @for (a of filteredCandidates(); track a.id) {
                   <li class="flex items-center gap-3 px-3 py-2.5" [class.opacity-50]="isHidden(a.id)">
                     @if (a.image) {
                       <img [src]="a.image" alt="" class="w-14 h-10 object-cover rounded shrink-0 bg-silver-100" loading="lazy" />
@@ -114,6 +130,8 @@ import { ToastService } from '../../services/toast.service';
                       </button>
                     </div>
                   </li>
+                } @empty {
+                  <li class="px-3 py-4 text-sm text-silver-500">{{ search().trim() ? (fr ? 'Aucun résultat.' : 'No result.') : (fr ? 'Aucun article.' : 'No article.') }}</li>
                 }
               </ul>
               <p class="text-xs text-silver-500 mt-1.5">
@@ -153,6 +171,13 @@ export class HomeArticlesAdminComponent implements OnInit {
 
   readonly featuredItems = computed(() =>
     this.featured().map(id => this.candidates().find(c => c.id === id)).filter(Boolean) as HomeArticleCandidate[]);
+
+  /** Recherche par titre dans la liste des articles. */
+  readonly search = signal('');
+  readonly filteredCandidates = computed(() => {
+    const q = this.search().trim().toLowerCase();
+    return q ? this.candidates().filter(c => (c.title || '').toLowerCase().includes(q)) : this.candidates();
+  });
 
   readonly heroLabel = computed(() => {
     const h = this.hero();

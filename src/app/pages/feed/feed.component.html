@@ -2,15 +2,35 @@
   <div class="max-w-2xl mx-auto px-4">
 
     <!-- Titre -->
-    <div class="flex items-baseline gap-3 mb-6">
+    <div class="flex items-baseline gap-3 mb-4">
       <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark">{{ title() }}</h1>
       @if (total()) { <span class="text-sm font-semibold text-silver-500">{{ total() }}</span> }
+    </div>
+
+    <!-- Recherche par titre -->
+    <div class="relative mb-6">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-silver-400 pointer-events-none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </span>
+      <input type="search" [ngModel]="search()" (ngModelChange)="onSearch($event)"
+             [placeholder]="fr() ? 'Rechercher par titre…' : 'Search by title…'"
+             class="w-full rounded-full border border-silver-300 bg-white pl-10 pr-10 py-2.5 text-sm text-gazety-dark focus:border-gazety-dark focus:outline-none" />
+      @if (search()) {
+        <button type="button" (click)="clearSearch()" [attr.aria-label]="fr() ? 'Effacer' : 'Clear'"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-silver-400 hover:text-gazety-dark transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      }
     </div>
 
     @if (loading() && items().length === 0) {
       <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
     } @else if (items().length === 0) {
-      <p class="text-silver-500 text-sm">{{ fr() ? 'Rien pour le moment.' : 'Nothing yet.' }}</p>
+      @if (search().trim()) {
+        <p class="text-silver-500 text-sm">{{ fr() ? 'Aucun résultat pour « ' + search().trim() + ' ».' : 'No result for “' + search().trim() + '”.' }}</p>
+      } @else {
+        <p class="text-silver-500 text-sm">{{ fr() ? 'Rien pour le moment.' : 'Nothing yet.' }}</p>
+      }
     } @else {
 
       <!-- Fil : une colonne, veilles en entier -->

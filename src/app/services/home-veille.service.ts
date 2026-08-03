@@ -75,10 +75,11 @@ export class HomeVeilleService {
   /** Fil paginé d'une catégorie gratuite (« Dernières actualités » sur l'accueil, ou le fil
    *  plein écran Actualité / Fait marquant). Token transmis s'il existe : le visiteur est
    *  bloqué au-delà de la 1re page (`gated`). `cat` par défaut = actualite (accueil inchangé). */
-  loadLatest(page = 1, cat: FeedCat = 'actualite') {
+  loadLatest(page = 1, cat: FeedCat = 'actualite', q = '') {
     const token = this.auth.token();
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    return this.http.get<LatestResponse>(`/api/veille/latest?page=${page}&cat=${cat}`, { headers });
+    const qs = q ? `&q=${encodeURIComponent(q)}` : '';
+    return this.http.get<LatestResponse>(`/api/veille/latest?page=${page}&cat=${cat}${qs}`, { headers });
   }
 
   openAdmin()  { this.adminOpen.set(true); }
