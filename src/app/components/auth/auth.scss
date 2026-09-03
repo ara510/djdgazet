@@ -171,7 +171,9 @@
   background: var(--color-bg);
   position: relative;
   display: flex;
-  align-items: center;
+  // `safe center` : centre le formulaire quand il tient, mais ne rogne jamais le
+  // haut (le titre) quand il déborde — le scroll permet alors d'atteindre le sommet.
+  align-items: safe center;
   justify-content: center;
   overflow-y: auto;
   padding: 2.5rem 2.5rem;

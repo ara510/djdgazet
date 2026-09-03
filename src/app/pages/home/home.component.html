@@ -1,54 +1,122 @@
-<!-- ── À la une : dernier article ── -->
+<!-- ── Bande « À la une » : derniers titres qui défilent (A1) ── -->
+@if (breaking().length) {
+  <div class="border-b border-silver-200 bg-white overflow-hidden">
+    <div class="container-news flex items-stretch gap-3">
+      <span class="shrink-0 self-center inline-flex items-center gap-1.5 my-2 px-2.5 py-1 rounded-full bg-gazety-red text-white text-[11px] font-bold uppercase tracking-wide">
+        <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>{{ fr() ? 'En continu' : 'Live' }}
+      </span>
+      <div class="relative flex-1 min-w-0 overflow-hidden group py-2">
+        <div class="flex items-center gap-8 w-max animate-marquee group-hover:[animation-play-state:paused]">
+          @for (v of breaking(); track v.id) {
+            <button type="button" (click)="openCard(v)" class="inline-flex items-center gap-2 whitespace-nowrap text-sm text-gazety-dark hover:text-gazety-red transition-colors">
+              <span class="w-1 h-1 rounded-full shrink-0" [style.background]="categoryColor(v)"></span>{{ heading(v) }}
+            </button>
+          }
+          <!-- Copie pour une boucle sans couture -->
+          @for (v of breaking(); track 'dup-' + v.id) {
+            <button type="button" (click)="openCard(v)" aria-hidden="true" tabindex="-1" class="inline-flex items-center gap-2 whitespace-nowrap text-sm text-gazety-dark hover:text-gazety-red transition-colors">
+              <span class="w-1 h-1 rounded-full shrink-0" [style.background]="categoryColor(v)"></span>{{ heading(v) }}
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Bandeau de date (façon une de journal) ── -->
+<div class="container-news pt-4">
+  <div class="flex items-center justify-between gap-3 border-y-2 border-gazety-dark py-1.5 text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-silver-600">
+    <span class="first-letter:capitalize truncate">{{ todayLong() }}</span>
+    <span class="hidden sm:inline font-bold text-gazety-dark tracking-[0.25em] whitespace-nowrap">{{ fr() ? 'Édition en ligne' : 'Online edition' }}</span>
+    <span class="whitespace-nowrap">Antananarivo</span>
+  </div>
+</div>
+
+<!-- ── La Une : article de tête + titres secondaires (mise en page journal) ── -->
 @if (hero(); as h) {
-  <section class="container-news pt-8">
-    <a [routerLink]="['/article', h.id]" class="group grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-      @if (h.image) {
-        <div class="h-64 lg:h-80 rounded-sm overflow-hidden bg-silver-100">
-          <img [src]="h.image" [alt]="h.image_alt || h.title" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
-        </div>
-      }
-      <div>
-        <div class="flex items-center gap-3 mb-3 text-xs">
-          <span class="uppercase tracking-wide font-semibold text-gazety-red">{{ sectorLabel(h.sector) }}</span>
-          <span class="text-silver-400">{{ formatDate(h.published_at) }}</span>
-        </div>
-        <h1 class="font-display font-black text-3xl md:text-4xl text-gazety-dark leading-tight group-hover:text-gazety-red transition-colors mb-3">{{ h.title }}</h1>
-        @if (h.description) {
-          <p class="text-silver-600 leading-relaxed line-clamp-3 mb-4">{{ excerpt(h.description, 220) }}…</p>
+  <section class="container-news pt-6 pb-8 border-b border-silver-200">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-0">
+      <!-- Article de tête (2 colonnes) -->
+      <a [routerLink]="['/article', h.id]" class="tap-press group lg:col-span-2 lg:pr-8 flex flex-col">
+        <span class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-gazety-red mb-2">
+          <span class="w-6 h-px bg-gazety-red"></span>{{ fr() ? 'À la une' : 'Top story' }}
+        </span>
+        @if (h.image) {
+          <div class="h-64 md:h-96 overflow-hidden bg-silver-100 mb-4">
+            <img [src]="h.image" [alt]="h.image_alt || h.title" decoding="async" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+          </div>
         }
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-silver-500">
-          <span class="font-semibold text-gazety-dark">{{ h.author }}</span>
+        <div class="flex items-center gap-3 mb-2 text-xs">
+          @if (h.sector) {
+            <span class="font-bold uppercase tracking-wide" [style.color]="secColor(h.sector)">{{ sectorLabel(h.sector) }}</span>
+          }
+          <span class="text-silver-400">{{ timeAgo(h.published_at) }}</span>
+        </div>
+        <h1 class="font-display font-black text-3xl md:text-5xl text-gazety-dark leading-[1.05] group-hover:text-gazety-red transition-colors mb-3 text-balance">{{ h.title }}</h1>
+        @if (h.description) {
+          <p class="text-[15px] md:text-base text-silver-600 leading-relaxed line-clamp-3 mb-3 max-w-2xl">{{ excerpt(h.description, 240) }}…</p>
+        }
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-silver-500 mt-auto">
+          <span class="font-semibold text-gazety-dark uppercase tracking-wide">{{ h.author }}</span>
           @if (h.read_minutes) { <span>· {{ h.read_minutes }} {{ fr() ? 'min de lecture' : 'min read' }}</span> }
           <span>· {{ h.views }} {{ fr() ? 'vues' : 'views' }}</span>
         </div>
-      </div>
-    </a>
+      </a>
+
+      <!-- Colonne secondaire (1 colonne) : « à lire aussi », séparés par des filets -->
+      @if (leadSecondary().length) {
+        <div class="lg:col-span-1 lg:pl-8 lg:border-l lg:border-silver-200 flex flex-col">
+          <span class="text-[11px] font-bold uppercase tracking-[0.2em] text-gazety-dark pb-2 mb-1 border-b-2 border-gazety-dark">{{ fr() ? 'À lire aussi' : 'Also read' }}</span>
+          <div class="flex flex-col divide-y divide-silver-200">
+            @for (a of leadSecondary(); track a.id) {
+              <a [routerLink]="['/article', a.id]" class="tap-press group flex gap-3 py-3.5">
+                @if (a.image) {
+                  <span class="w-20 h-16 shrink-0 overflow-hidden bg-silver-100 block">
+                    <img [src]="a.image" [alt]="a.image_alt || a.title" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  </span>
+                }
+                <span class="flex-1 min-w-0 flex flex-col gap-1">
+                  @if (a.sector) { <span class="text-[10px] font-bold uppercase tracking-wide" [style.color]="secColor(a.sector)">{{ sectorLabel(a.sector) }}</span> }
+                  <span class="font-display font-bold text-[15px] leading-snug text-gazety-dark line-clamp-3 group-hover:text-gazety-red transition-colors">{{ a.title }}</span>
+                  <span class="text-[10px] text-silver-400">{{ timeAgo(a.published_at) }}</span>
+                </span>
+              </a>
+            }
+          </div>
+        </div>
+      }
+    </div>
   </section>
 }
 
 <!-- ── Derniers articles ── -->
 <section class="container-news py-10">
-  <h2 class="font-display font-bold text-2xl text-gazety-dark mb-6 pb-2 border-b-2 border-gazety-red inline-block">
-    {{ fr() ? 'Derniers articles' : 'Latest articles' }}
-  </h2>
+  <div class="flex items-center gap-4 mb-7">
+    <span class="h-px flex-1 bg-gazety-dark/15"></span>
+    <h2 class="font-display font-bold text-lg sm:text-xl uppercase tracking-[0.22em] text-gazety-dark whitespace-nowrap">{{ fr() ? 'Derniers articles' : 'Latest articles' }}</h2>
+    <span class="h-px flex-1 bg-gazety-dark/15"></span>
+  </div>
 
   @if (loadingArticles()) {
-    <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+    <p class="text-silver-500 text-sm text-center">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
   } @else if (noArticles()) {
-    <p class="text-silver-500 text-sm">{{ fr() ? 'Aucun article publié pour le moment.' : 'No articles published yet.' }}</p>
-  } @else {
+    <p class="text-silver-500 text-sm text-center">{{ fr() ? 'Aucun article publié pour le moment.' : 'No articles published yet.' }}</p>
+  } @else if (gridArticles().length) {
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      @for (a of rest(); track a.id) {
-        <a [routerLink]="['/article', a.id]" class="group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
+      @for (a of gridArticles(); track a.id) {
+        <a [routerLink]="['/article', a.id]" class="tap-press group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
           @if (a.image) {
             <div class="h-44 bg-silver-100 overflow-hidden">
-              <img [src]="a.image" [alt]="a.image_alt || a.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+              <img [src]="a.image" [alt]="a.image_alt || a.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
             </div>
           }
           <div class="p-4 flex flex-col gap-2 flex-1">
             <div class="flex items-center gap-2 text-[10px] uppercase tracking-wide">
-              <span class="text-gazety-red font-semibold">{{ sectorLabel(a.sector) }}</span>
-              <span class="text-silver-400">{{ formatDate(a.published_at) }}</span>
+              @if (a.sector) {
+                <span class="px-1.5 py-0.5 rounded-full font-bold" [style.color]="secColor(a.sector)" [style.background]="secTint(a.sector)">{{ sectorLabel(a.sector) }}</span>
+              }
+              <span class="text-silver-400 normal-case tracking-normal">{{ timeAgo(a.published_at) }}</span>
             </div>
             <h3 class="font-display font-bold text-lg text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</h3>
             @if (a.description) {
@@ -61,15 +129,34 @@
         </a>
       }
     </div>
-
-    @if (!loggedIn()) {
-      <p class="text-center text-sm text-silver-500 mt-6">
-        {{ fr() ? 'Créez un compte gratuit pour lire les articles en entier.' : 'Create a free account to read full articles.' }}
-        <button (click)="signup()" class="text-gazety-red font-semibold hover:underline ml-1">{{ fr() ? 'Créer un compte' : 'Create account' }}</button>
-      </p>
-    }
   }
 </section>
+
+<!-- ── Les plus lus (A5) : articles triés par nombre de vues ── -->
+@if (popular().length) {
+  <section class="bg-silver-50 py-10">
+    <div class="container-news">
+      <div class="flex items-center gap-4 mb-7">
+        <span class="h-px flex-1 bg-gazety-dark/15"></span>
+        <h2 class="font-display font-bold text-lg sm:text-xl uppercase tracking-[0.22em] text-gazety-dark whitespace-nowrap">{{ fr() ? 'Les plus lus' : 'Most read' }}</h2>
+        <span class="h-px flex-1 bg-gazety-dark/15"></span>
+      </div>
+      <ol class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-1">
+        @for (a of popular(); track a.id; let i = $index) {
+          <li class="border-b border-silver-200">
+            <a [routerLink]="['/article', a.id]" class="tap-press group flex items-center gap-4 py-3.5">
+              <span class="font-display font-black text-2xl w-7 shrink-0 text-center leading-none" [style.color]="secColor(a.sector)">{{ i + 1 }}</span>
+              <span class="flex-1 min-w-0 flex flex-col gap-0.5">
+                <span class="font-display font-bold text-[15px] text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</span>
+                <span class="text-[11px] text-silver-500">{{ sectorLabel(a.sector) }} · {{ a.views }} {{ fr() ? 'vues' : 'views' }}</span>
+              </span>
+            </a>
+          </li>
+        }
+      </ol>
+    </div>
+  </section>
+}
 
 <!-- Bande 2 « actualités & faits marquants » (accueil, juste avant Veille média) -->
 <app-marquee-bar band="home" />
@@ -78,9 +165,12 @@
 @if (homeEnabled()) {
 <section id="veille-media" class="bg-silver-50 py-10">
   <div class="container-news">
-    <div class="flex items-center justify-between gap-4 mb-6">
-      <h2 class="font-display font-bold text-2xl text-gazety-dark">{{ fr() ? 'Veille média' : 'Media watch' }}</h2>
-      <button (click)="openVeille()" class="btn-primary text-sm whitespace-nowrap">
+    <div class="flex items-start justify-between gap-4 mb-6">
+      <div class="min-w-0">
+        <h2 class="font-display font-bold text-2xl text-gazety-dark">{{ fr() ? 'Veille média' : 'Media watch' }}</h2>
+        <p class="text-sm text-silver-500 mt-1 max-w-xl">{{ fr() ? "L'actualité malgache suivie en temps réel par notre rédaction : presse, web, radio, TV et réseaux sociaux." : 'Malagasy news tracked in real time by our newsroom: press, web, radio, TV and social media.' }}</p>
+      </div>
+      <button (click)="openVeille()" class="btn-primary tap-press text-sm whitespace-nowrap shrink-0">
         {{ loggedIn() ? (fr() ? 'Ouvrir ma veille' : 'Open my watch') : (fr() ? 'Créer un compte' : 'Create account') }}
       </button>
     </div>
@@ -88,19 +178,30 @@
     @if (veilles().length === 0) {
       <p class="text-silver-500 text-sm">{{ fr() ? 'Aucune veille pour le moment.' : 'No watch items yet.' }}</p>
     } @else {
-      <div [ngClass]="gridClass()">
-        @for (v of veilles(); track v.id) {
+      <div class="flex gap-5 items-start">
+        @for (col of veilleColumns(); track $index) {
+        <div class="flex-1 min-w-0 flex flex-col gap-5">
+        @for (v of col; track v.id) {
           <article (click)="openCard(v)"
-                   class="group relative bg-white border border-silver-200 rounded-lg overflow-hidden break-inside-avoid mb-5 cursor-pointer hover:border-gazety-red hover:shadow-md transition-all">
-            <!-- Photos (cadrées, sans letterbox) — défilent en boucle si plusieurs ; toujours visibles -->
+                   class="tap-press group relative bg-white border border-silver-200 rounded-lg overflow-hidden cursor-pointer hover:border-gazety-red hover:shadow-md transition-all">
+            <!-- Photos (cadrées, sans letterbox) — coupures presse floutées pour les visiteurs -->
             @if (imagesOf(v).length) {
               <div class="relative bg-silver-100 overflow-hidden" [ngClass]="imgClass()">
-                <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)" />
+                <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)"
+                                    [style.filter]="blurPresse(v) ? 'blur(12px)' : null" [style.transform]="blurPresse(v) ? 'scale(1.08)' : null" />
                 @if (v.locked) {
                   <span class="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gazety-dark/90 text-white text-[10px] font-bold uppercase tracking-wide">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     {{ fr() ? 'Abonnés' : 'Members' }}
                   </span>
+                }
+                @if (blurPresse(v)) {
+                  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gazety-dark/85 text-white text-[10px] font-bold uppercase tracking-wide">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      {{ fr() ? 'Réservé aux abonnés' : 'Members only' }}
+                    </span>
+                  </div>
                 }
               </div>
             }
@@ -144,7 +245,7 @@
               </div>
 
               @if (v.excerpt) {
-                <p class="text-sm text-silver-600 leading-relaxed line-clamp-3" [innerHTML]="richText(v.excerpt)"></p>
+                <p class="text-sm text-silver-600 leading-relaxed line-clamp-3" [class.text-justify]="v.justify" [innerHTML]="richText(v.excerpt)"></p>
               }
 
               <!-- Pied : sources (le clic sur la carte ouvre la lecture intégrale) ou mur abonnés -->
@@ -174,6 +275,8 @@
             </div>
           </article>
         }
+        </div>
+        }
       </div>
     }
   </div>
@@ -182,14 +285,32 @@
 
 <!-- ── Dernières actualités : fil complet en aperçus ; clic = lecture intégrale (même modale) ── -->
 <section id="dernieres-actualites" class="container-news py-10">
-  <div class="flex items-baseline gap-3 mb-6">
-    <h2 class="font-display font-black text-3xl md:text-4xl text-gazety-dark">
-      {{ fr() ? 'Dernières actualités' : 'Latest news' }}
-    </h2>
-    @if (latestTotal()) {
-      <span class="text-xs font-semibold text-silver-500">{{ latestTotal() }}</span>
-    }
+  <div class="flex items-center gap-4 mb-6">
+    <span class="h-px flex-1 bg-gazety-dark/15"></span>
+    <h2 class="font-display font-bold text-lg sm:text-xl uppercase tracking-[0.22em] text-gazety-dark whitespace-nowrap">{{ fr() ? 'Dernières actualités' : 'Latest news' }}</h2>
+    <span class="h-px flex-1 bg-gazety-dark/15"></span>
   </div>
+
+  <!-- Filtres rapides par secteur (A6) -->
+  @if (sectorsInLatest().length > 1) {
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+      <button type="button" (click)="setSector(null)"
+              class="tap-press px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border transition-colors"
+              [class.text-white]="activeSector() === null" [class.bg-gazety-dark]="activeSector() === null" [class.border-gazety-dark]="activeSector() === null"
+              [class.text-silver-600]="activeSector() !== null" [class.border-silver-300]="activeSector() !== null">
+        {{ fr() ? 'Tous' : 'All' }}
+      </button>
+      @for (s of sectorsInLatest(); track s) {
+        <button type="button" (click)="setSector(s)"
+                class="tap-press px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border transition-colors"
+                [style.color]="activeSector() === s ? '#fff' : secColor(s)"
+                [style.background]="activeSector() === s ? secColor(s) : secTint(s)"
+                [style.borderColor]="activeSector() === s ? secColor(s) : 'transparent'">
+          {{ sectorLabel(s) }}
+        </button>
+      }
+    </div>
+  }
 
   @if (latestLoading()) {
     <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
@@ -197,16 +318,25 @@
     <p class="text-silver-500 text-sm">{{ fr() ? 'Aucune actualité pour le moment.' : 'No news yet.' }}</p>
   } @else {
     <div class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-x-10 gap-y-8 items-start">
-      <!-- Colonne gauche : actus illustrées -->
+      <!-- Colonne gauche : actus illustrées, regroupées par jour (A7) -->
       @if (latestWithPhoto().length) {
-        <ul class="border-t border-silver-200">
-          @for (v of latestWithPhoto(); track v.id) {
+        <div class="flex flex-col">
+        @for (grp of latestWithPhotoByDay(); track grp.label) {
+          <p class="text-[11px] font-bold uppercase tracking-wider text-silver-400 pt-4 pb-1.5 first:pt-0">{{ grp.label }}</p>
+          <ul class="border-t border-silver-200">
+          @for (v of grp.items; track v.id) {
             <li class="border-b border-silver-200">
               <button type="button" (click)="openCard(v)"
                       class="group w-full text-left flex items-start gap-4 py-4 hover:bg-silver-50/70 transition-colors">
-                <span class="w-28 sm:w-32 h-18 sm:h-20 shrink-0 rounded overflow-hidden bg-silver-100 block">
+                <span class="relative w-28 sm:w-32 h-18 sm:h-20 shrink-0 rounded overflow-hidden bg-silver-100 block">
                   <img [src]="v.image" [alt]="heading(v)" loading="lazy"
-                       class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                       class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                       [style.filter]="blurPresse(v) ? 'blur(8px)' : null" [style.transform]="blurPresse(v) ? 'scale(1.1)' : null" />
+                  @if (blurPresse(v)) {
+                    <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </span>
+                  }
                 </span>
                 <span class="flex-1 min-w-0 flex flex-col gap-1">
                   <span class="text-[10px] font-bold uppercase tracking-wider" [style.color]="categoryColor(v)">{{ categoryOf(v) }}</span>
@@ -220,7 +350,9 @@
               </button>
             </li>
           }
-        </ul>
+          </ul>
+        }
+        </div>
       }
 
       <!-- Colonne droite : actus sans photo, titre seul -->
@@ -283,12 +415,24 @@
 
       <div class="overflow-y-auto">
       @if (imagesOf(item).length) {
-        <div class="relative bg-silver-100 h-72 overflow-hidden cursor-zoom-in group/photo" (click)="$event.stopPropagation(); openPhoto()">
-          <app-image-carousel class="absolute inset-0" [images]="imagesOf(item)" [alt]="heading(item)" />
-          <span class="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/55 text-white text-[11px] font-semibold backdrop-blur-sm opacity-0 group-hover/photo:opacity-100 transition-opacity">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
-            {{ fr() ? 'Voir la photo' : 'View photo' }}
-          </span>
+        <div class="relative bg-silver-100 h-72 overflow-hidden group/photo" [class.cursor-zoom-in]="!blurPresse(item)" [class.cursor-pointer]="blurPresse(item)"
+             (click)="$event.stopPropagation(); blurPresse(item) ? signup() : openPhoto()">
+          <app-image-carousel class="absolute inset-0" [images]="imagesOf(item)" [alt]="heading(item)"
+                              [style.filter]="blurPresse(item) ? 'blur(14px)' : null" [style.transform]="blurPresse(item) ? 'scale(1.08)' : null" />
+          @if (blurPresse(item)) {
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4 pointer-events-none">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gazety-dark/85 text-white text-xs font-bold">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                {{ fr() ? 'Réservé aux abonnés' : 'Members only' }}
+              </span>
+              <span class="text-[11px] font-semibold text-white bg-black/45 px-2 py-0.5 rounded">{{ fr() ? 'Créez un compte pour voir la coupure' : 'Create an account to view the clipping' }}</span>
+            </div>
+          } @else {
+            <span class="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/55 text-white text-[11px] font-semibold backdrop-blur-sm opacity-0 group-hover/photo:opacity-100 transition-opacity">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg>
+              {{ fr() ? 'Voir la photo' : 'View photo' }}
+            </span>
+          }
         </div>
       }
 
@@ -329,7 +473,7 @@
         </div>
 
         @if (item.excerpt) {
-          <p class="text-[15px] text-silver-700 leading-relaxed whitespace-pre-line text-justify" [innerHTML]="richText(item.excerpt)"></p>
+          <p class="text-[15px] text-silver-700 leading-relaxed whitespace-pre-line" [class.text-justify]="item.justify" [innerHTML]="richText(item.excerpt)"></p>
         }
 
         @if (urlsOf(item).length) {

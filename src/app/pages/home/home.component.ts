@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal, computed } from '@angular/core';
+import { Component, HostListener, effect, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { I18nService } from '../../services/i18n.service';
@@ -13,6 +13,7 @@ import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
 import { ImageCarouselComponent } from '../../components/image-carousel/image-carousel.component';
 import { sectorColor, sectorTint } from '../../services/sectors';
 import { formatRecapText } from '../../services/rich-text';
+import { normalizeExternalUrl } from '../../utils/url';
 
 @Component({
   selector: 'app-home',
@@ -38,6 +39,14 @@ export class HomeComponent {
   readonly hero = signal<ArticleItem | null>(null);
   readonly rest = signal<ArticleItem[]>([]);
   readonly noArticles = computed(() => !this.hero() && this.rest().length === 0);
+  /** Mise en page « une de journal » : titres secondaires en tête, puis grille en dessous. */
+  readonly leadSecondary = computed(() => this.rest().slice(0, 3));
+  readonly gridArticles  = computed(() => this.rest().slice(3));
+  /** Date longue façon journal (« mardi 3 septembre 2026 »). */
+  todayLong(): string {
+    return new Date().toLocaleDateString(this.fr() ? 'fr-FR' : 'en-GB',
+      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
 
   // ── Section « Veille média » (pilotée par l'admin, veilles taguées Actualité) ──
   readonly veilles = signal<VeilleItem[]>([]);
@@ -52,19 +61,82 @@ export class HomeComponent {
   readonly latestHasMore = signal(false);
   readonly latestGated   = signal(false);
 
+  // ── Filtre rapide par secteur (A6) : chips au-dessus du fil ──
+  readonly activeSector = signal<string | null>(null);
+  /** Secteurs réellement présents dans le fil courant (pour n'afficher que des chips utiles). */
+  readonly sectorsInLatest = computed(() => {
+    const seen: string[] = [];
+    for (const v of this.latest()) {
+      if (v.sector && !seen.includes(v.sector)) seen.push(v.sector);
+    }
+    return seen;
+  });
+  setSector(s: string | null) { this.activeSector.set(this.activeSector() === s ? null : s); }
+  private readonly latestFiltered = computed(() => {
+    const s = this.activeSector();
+    return s ? this.latest().filter(v => v.sector === s) : this.latest();
+  });
+
   /** Le fil est scindé : à gauche les actus illustrées (vignette), à droite celles sans photo
    *  (titre seul, pleine largeur) — évite les vignettes grises vides. */
-  readonly latestWithPhoto = computed(() => this.latest().filter(v => !!v.image));
-  readonly latestNoPhoto   = computed(() => this.latest().filter(v => !v.image));
+  readonly latestWithPhoto = computed(() => this.latestFiltered().filter(v => !!v.image));
+  readonly latestNoPhoto   = computed(() => this.latestFiltered().filter(v => !v.image));
 
-  /** Colonnes masonry (CSS multi-colonnes) selon l'échelle : cartes à hauteur naturelle,
-   *  elles comblent les vides verticaux → pas de « gros blanc » (comme la veille admin). */
-  readonly gridClass = computed(() => {
-    switch (this.homeScale()) {
-      case 'compact': return 'columns-1 sm:columns-2 lg:columns-4 [column-gap:1.25rem]';
-      case 'grand':   return 'columns-1 md:columns-2 [column-gap:1.25rem]';
-      default:        return 'columns-1 sm:columns-2 lg:columns-3 [column-gap:1.25rem]';
+  /** Bande « À la une » (A1) : quelques derniers titres qui défilent sous l'en-tête. */
+  readonly breaking = computed(() => this.latest().slice(0, 7));
+
+  /** Fil illustré regroupé par jour (A7) : Aujourd'hui / Hier / date. */
+  readonly latestWithPhotoByDay = computed(() => {
+    const groups: { label: string; items: VeilleItem[] }[] = [];
+    for (const v of this.latestWithPhoto()) {
+      const label = this.dayLabel(v.published_at);
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.items.push(v);
+      else groups.push({ label, items: [v] });
     }
+    return groups;
+  });
+  /** Étiquette de jour relative pour les séparateurs du fil. */
+  dayLabel(value?: string): string {
+    if (!value) return this.fr() ? 'Sans date' : 'Undated';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return this.fr() ? 'Sans date' : 'Undated';
+    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+    if (days <= 0) return this.fr() ? "Aujourd'hui" : 'Today';
+    if (days === 1) return this.fr() ? 'Hier' : 'Yesterday';
+    return d.toLocaleDateString(this.fr() ? 'fr-FR' : 'en-GB', { weekday: 'long', day: '2-digit', month: 'long' });
+  }
+
+  // ── « Les plus lus » (A5) : articles triés par nombre de vues ──
+  readonly popular = signal<ArticleItem[]>([]);
+  private loadPopular() {
+    this.articlesSvc.list().subscribe({
+      next: items => {
+        const top = [...(items ?? [])].sort((a, b) => (b.views ?? 0) - (a.views ?? 0)).slice(0, 5);
+        this.popular.set(top);
+      },
+      error: () => this.popular.set([]),
+    });
+  }
+
+  /** Masonry STABLE : on répartit les cartes en colonnes fixes côté composant (au lieu du
+   *  CSS `columns` qui rééquilibre les colonnes au chargement des polices/images → cartes qui
+   *  « sautent » de place). Chaque carte garde sa colonne ; recalcul seulement au redimensionnement. */
+  readonly winWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  @HostListener('window:resize') onResize() { this.winWidth.set(window.innerWidth); }
+  private colsFor(w: number, scale: HomeScale): number {
+    if (scale === 'grand')   return w >= 768 ? 2 : 1;
+    if (scale === 'compact') return w >= 1024 ? 4 : w >= 640 ? 2 : 1;
+    return w >= 1024 ? 3 : w >= 640 ? 2 : 1; // normal
+  }
+  readonly colCount = computed(() => this.colsFor(this.winWidth(), this.homeScale()));
+  /** Cartes réparties en `colCount` colonnes (ordre naturel gauche→droite, ligne par ligne). */
+  readonly veilleColumns = computed(() => {
+    const n = this.colCount();
+    const cols: VeilleItem[][] = Array.from({ length: n }, () => []);
+    this.veilles().forEach((v, i) => cols[i % n].push(v));
+    return cols;
   });
   /** Hauteur d'image (object-cover, sans letterbox) selon l'échelle. */
   readonly imgClass = computed(() => {
@@ -79,6 +151,7 @@ export class HomeComponent {
     effect(() => {
       this.homeArticles.version();
       this.loadArticles();
+      this.loadPopular();
     });
     // Recharge la section accueil au démarrage, à chaque enregistrement admin (version)
     // ET à la connexion/déconnexion (le contenu dépend du token : déverrouillage + plafond visiteur).
@@ -101,6 +174,7 @@ export class HomeComponent {
   // ── Fil « Dernières actualités » ──
   loadLatest(page = 1) {
     this.latestLoading.set(true);
+    this.activeSector.set(null); // repart d'un fil non filtré à chaque (re)chargement de page
     this.homeVeille.loadLatest(page).subscribe({
       next: r => {
         this.latest.set(r.items ?? []);
@@ -162,7 +236,7 @@ export class HomeComponent {
   tagsOf(v: VeilleItem): string[] { return v.tags?.length ? v.tags : []; }
   /** Extrait avec formatage léger (**gras**, *italique*, ==surlignage==) → HTML pour [innerHTML]. */
   richText(t?: string | null): string { return formatRecapText(t); }
-  urlsOf(v: VeilleItem): string[] { return v.urls?.length ? v.urls : (v.url ? [v.url] : []); }
+  urlsOf(v: VeilleItem): string[] { return (v.urls?.length ? v.urls : (v.url ? [v.url] : [])).map(normalizeExternalUrl).filter(Boolean); }
   heading(v: VeilleItem): string { return v.title || this.sectorLabel(v.sector) || v.source || (this.fr() ? 'Veille' : 'Watch'); }
 
   // ── Types de source, réseaux, secteurs : libellés + codes couleur (repris de la veille) ──
@@ -186,6 +260,11 @@ export class HomeComponent {
   secTint(s?: string | null): string { return sectorTint(s); }
   /** Toutes les images de la veille (tableau `images`, repli sur l'image principale). */
   imagesOf(v: VeilleItem): string[] { return v.images?.length ? v.images : (v.image ? [v.image] : []); }
+
+  /** Veille « presse » = aucun type web/réseau social (presse écrite, radio, TV, institution…). */
+  isPresse(v: VeilleItem): boolean { const t = this.typesOf(v); return !t.some(x => x === 'web' || x === 'social'); }
+  /** Coupure de journal floutée : visiteur non connecté + veille presse avec image. */
+  blurPresse(v: VeilleItem): boolean { return !this.loggedIn() && this.isPresse(v) && this.imagesOf(v).length > 0; }
 
   formatDate(value?: string): string {
     if (!value) return '';

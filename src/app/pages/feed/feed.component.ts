@@ -11,6 +11,7 @@ import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
 import { ImageCarouselComponent } from '../../components/image-carousel/image-carousel.component';
 import { sectorColor, sectorTint } from '../../services/sectors';
 import { formatRecapText } from '../../services/rich-text';
+import { normalizeExternalUrl } from '../../utils/url';
 
 /**
  * Fil plein écran d'une catégorie gratuite (Actualité / Fait marquant), façon Facebook :
@@ -151,7 +152,7 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
   tagLabel(t?: string | null): string { const o = t ? this.tagLabels[t] : null; return o ? (this.fr() ? o.fr : o.en) : ''; }
   tagsOf(v: VeilleItem): string[] { return v.tags?.length ? v.tags : []; }
   richText(t?: string | null): string { return formatRecapText(t); }
-  urlsOf(v: VeilleItem): string[] { return v.urls?.length ? v.urls : (v.url ? [v.url] : []); }
+  urlsOf(v: VeilleItem): string[] { return (v.urls?.length ? v.urls : (v.url ? [v.url] : [])).map(normalizeExternalUrl).filter(Boolean); }
   heading(v: VeilleItem): string { return v.title || this.sectorLabel(v.sector) || v.source || (this.fr() ? 'Veille' : 'Watch'); }
   typesOf(v: VeilleItem): string[] { return v.source_types?.length ? v.source_types : (v.source_type ? [v.source_type] : []); }
   networksOf(v: VeilleItem): string[] { return v.social_networks?.length ? v.social_networks : (v.social_network ? [v.social_network] : []); }
@@ -163,6 +164,13 @@ export class FeedComponent implements AfterViewInit, OnDestroy {
   secColor(s?: string | null): string { return sectorColor(s); }
   secTint(s?: string | null): string { return sectorTint(s); }
   imagesOf(v: VeilleItem): string[] { return v.images?.length ? v.images : (v.image ? [v.image] : []); }
+
+  /** Veille « presse » = aucun type web/réseau social (presse écrite, radio, TV, institution…). */
+  isPresse(v: VeilleItem): boolean { const t = this.typesOf(v); return !t.some(x => x === 'web' || x === 'social'); }
+  /** Coupure de journal floutée : visiteur non connecté + veille presse avec image. */
+  blurPresse(v: VeilleItem): boolean { return !this.loggedIn() && this.isPresse(v) && this.imagesOf(v).length > 0; }
+  /** Clic sur l'image : floutée → inscription ; sinon → visionneuse plein écran. */
+  onImageClick(v: VeilleItem) { if (this.blurPresse(v)) this.signup(); else this.openLightbox(this.imagesOf(v), 0); }
 
   formatDate(value?: string): string {
     if (!value) return '';

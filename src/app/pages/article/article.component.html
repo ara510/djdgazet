@@ -19,7 +19,8 @@
 
     @if (galleryImages().length) {
       <figure class="container-news max-w-5xl">
-        <img [src]="galleryImages()[0]" [alt]="ba.image_alt || ba.title" class="w-full rounded-sm object-cover max-h-[28rem]"
+        <img [src]="galleryImages()[0]" [alt]="ba.image_alt || ba.title" (click)="openLightbox(0)"
+             class="w-full rounded-sm object-cover max-h-[28rem] cursor-zoom-in"
              [style.object-position]="ba.image_position || '50% 50%'" />
         @if (ba.image_alt) {
           <figcaption class="text-xs text-silver-500 mt-2 italic">{{ ba.image_alt }}</figcaption>
@@ -37,8 +38,9 @@
 
           @if (showGallery()) {
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-              @for (img of galleryImages(); track img) {
-                <img [src]="img" alt="" class="w-full h-32 rounded-sm object-cover border border-silver-200" loading="lazy" />
+              @for (img of galleryImages(); track img; let i = $index) {
+                <img [src]="img" alt="" (click)="openLightbox(i)" loading="lazy"
+                     class="w-full h-32 rounded-sm object-cover border border-silver-200 cursor-zoom-in hover:opacity-90 hover:border-gazety-red transition" />
               }
             </div>
           }
@@ -47,40 +49,55 @@
     }
 
     <div class="container-news max-w-3xl py-10">
-      @if (ba.locked) {
-        <!-- Visiteur : aperçu + création de compte pour lire -->
-        <div class="relative">
-          <p class="text-lg text-gazety-dark leading-relaxed">{{ ba.description }}…</p>
-          <div class="mt-6 border border-gold-200 bg-gold-50/60 rounded-sm p-6 text-center">
-            <svg class="w-8 h-8 mx-auto text-gazety-red mb-2" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <p class="font-display font-bold text-lg text-gazety-dark mb-1">{{ i18n.isFrench() ? 'Créez un compte pour lire la suite' : 'Create an account to read on' }}</p>
-            <p class="text-sm text-silver-600 mb-4">{{ i18n.isFrench() ? "La lecture complète des articles est gratuite avec un compte." : 'Reading full articles is free with an account.' }}</p>
-            <button (click)="signup()" class="btn-primary text-sm">{{ i18n.isFrench() ? 'Créer un compte' : 'Create account' }}</button>
-          </div>
-        </div>
+      @if (ba.description) {
+        <div class="article-richtext text-lg text-gazety-dark leading-relaxed" [innerHTML]="descriptionHtml()"></div>
       } @else {
-        @if (ba.description) {
-          <div class="article-richtext text-lg text-gazety-dark leading-relaxed" [innerHTML]="descriptionHtml()"></div>
-        } @else {
-          <p class="text-silver-500 italic">{{ i18n.isFrench() ? 'Aucun contenu.' : 'No content.' }}</p>
-        }
+        <p class="text-silver-500 italic">{{ i18n.isFrench() ? 'Aucun contenu.' : 'No content.' }}</p>
+      }
 
-        <!-- Actions en bas, séparées du texte par un trait -->
-        <div class="border-t border-silver-200 mt-10 pt-6 flex items-center gap-3">
-          <button (click)="toggleFavorite()" [disabled]="favLoading()"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-sm font-semibold transition-colors disabled:opacity-60"
-                  [class.border-gazety-red]="favorite()" [class.text-gazety-red]="favorite()"
-                  [class.border-silver-300]="!favorite()" [class.text-gazety-dark]="!favorite()">
-            <svg class="w-4 h-4" [attr.fill]="favorite() ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-            {{ favorite() ? (i18n.isFrench() ? 'Enregistré' : 'Saved') : (i18n.isFrench() ? 'Enregistrer' : 'Save') }}
+      <!-- Partage (grand public, sans compte) + enregistrer -->
+      <div class="border-t border-silver-200 mt-10 pt-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-silver-500 mb-3">{{ i18n.isFrench() ? 'Partager cet article' : 'Share this article' }}</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Facebook -->
+          <button (click)="shareFacebook()" aria-label="Facebook" title="Facebook"
+                  class="w-10 h-10 inline-flex items-center justify-center rounded-full text-white hover:opacity-90 transition-opacity" style="background:#1877F2">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.5V12h2.7l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/></svg>
           </button>
-          <button (click)="copyLink()"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-silver-300 text-gazety-dark text-sm font-semibold hover:bg-silver-100 transition-colors">
+          <!-- Messenger -->
+          <button (click)="shareMessenger()" aria-label="Messenger" title="Messenger"
+                  class="w-10 h-10 inline-flex items-center justify-center rounded-full text-white hover:opacity-90 transition-opacity" style="background:#0084FF">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.4 2 2 6.1 2 11.2c0 2.9 1.4 5.4 3.7 7.1V22l3.4-1.9c.9.3 1.9.4 2.9.4 5.6 0 10-4.1 10-9.2S17.6 2 12 2zm1 12.4l-2.5-2.7-5 2.7 5.5-5.8 2.6 2.7 4.9-2.7-5.5 5.8z"/></svg>
+          </button>
+          <!-- X -->
+          <button (click)="shareX()" aria-label="X" title="X"
+                  class="w-10 h-10 inline-flex items-center justify-center rounded-full text-white hover:opacity-90 transition-opacity" style="background:#111">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.5 8.6L23 22h-6.8l-5.3-6.9L4.8 22H1.9l8-9.2L1.5 2h6.9l4.8 6.4L18.9 2zm-2.4 18h1.9L7.6 3.9H5.6L16.5 20z"/></svg>
+          </button>
+          <!-- Instagram -->
+          <button (click)="shareInstagram()" aria-label="Instagram" title="Instagram"
+                  class="w-10 h-10 inline-flex items-center justify-center rounded-full text-white hover:opacity-90 transition-opacity" style="background:#E4405F">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 1.8c-3.1 0-3.5 0-4.7.1-1.1.1-1.7.2-2.1.4-.5.2-.9.4-1.3.8-.4.4-.6.8-.8 1.3-.2.4-.3 1-.4 2.1-.1 1.2-.1 1.6-.1 3.3s0 2.1.1 3.3c.1 1.1.2 1.7.4 2.1.2.5.4.9.8 1.3.4.4.8.6 1.3.8.4.2 1 .3 2.1.4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.7-.2 2.1-.4.5-.2.9-.4 1.3-.8.4-.4.6-.8.8-1.3.2-.4.3-1 .4-2.1.1-1.2.1-1.6.1-3.3s0-2.1-.1-3.3c-.1-1.1-.2-1.7-.4-2.1-.2-.5-.4-.9-.8-1.3-.4-.4-.8-.6-1.3-.8-.4-.2-1-.3-2.1-.4-1.2-.1-1.6-.1-4.7-.1zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zm0 1.8a3.1 3.1 0 1 0 0 6.2 3.1 3.1 0 0 0 0-6.2zm5.1-.3a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z"/></svg>
+          </button>
+          <!-- Lien brut -->
+          <button (click)="copyLink()" title="{{ i18n.isFrench() ? 'Copier le lien' : 'Copy link' }}"
+                  class="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-silver-300 text-gazety-dark text-sm font-semibold hover:bg-silver-100 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.328-1.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
             {{ i18n.isFrench() ? 'Copier le lien' : 'Copy link' }}
           </button>
+
+          <!-- Enregistrer (comptes connectés) -->
+          @if (auth.isLoggedIn()) {
+            <button (click)="toggleFavorite()" [disabled]="favLoading()"
+                    class="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border text-sm font-semibold transition-colors disabled:opacity-60 ml-auto"
+                    [class.border-gazety-red]="favorite()" [class.text-gazety-red]="favorite()"
+                    [class.border-silver-300]="!favorite()" [class.text-gazety-dark]="!favorite()">
+              <svg class="w-4 h-4" [attr.fill]="favorite() ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+              {{ favorite() ? (i18n.isFrench() ? 'Enregistré' : 'Saved') : (i18n.isFrench() ? 'Enregistrer' : 'Save') }}
+            </button>
+          }
         </div>
-      }
+      </div>
     </div>
 
     <!-- Sur le même secteur -->
@@ -125,6 +142,31 @@
       </div>
     </section>
   </article>
+
+  <!-- Visionneuse plein écran : photo en grand, fond flou, animation d'ouverture -->
+  @if (lightbox() !== null) {
+    <div class="fixed inset-0 z-[700] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" (click)="closeLightbox()">
+      <img [src]="galleryImages()[lightbox()!]" [alt]="ba.image_alt || ba.title" (click)="$event.stopPropagation()"
+           class="lb-zoom max-w-full max-h-[92vh] object-contain rounded-sm shadow-2xl" />
+
+      <button type="button" (click)="closeLightbox()" [attr.aria-label]="i18n.isFrench() ? 'Fermer' : 'Close'"
+              class="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      @if (galleryImages().length > 1) {
+        <button type="button" (click)="lbPrev($event)" [attr.aria-label]="i18n.isFrench() ? 'Précédente' : 'Previous'"
+                class="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button type="button" (click)="lbNext($event)" [attr.aria-label]="i18n.isFrench() ? 'Suivante' : 'Next'"
+                class="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <span class="fixed bottom-4 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-white/10 text-white text-xs font-semibold">{{ lightbox()! + 1 }} / {{ galleryImages().length }}</span>
+      }
+    </div>
+  }
 } @else {
   <!-- Id inconnu ou non numérique : les anciens articles de démo (lorem ipsum) ont été retirés. -->
   <div class="container-news py-20 text-center">

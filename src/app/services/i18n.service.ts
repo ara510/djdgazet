@@ -28,6 +28,7 @@ const DICTIONARY: TranslationDict = {
   'sector.tourisme': { fr: 'Tourisme', en: 'Tourism' },
   'sector.mines': { fr: 'Mines', en: 'Mining' },
   'sector.telecoms': { fr: 'Télécoms', en: 'Telecoms' },
+  'sector.chronique': { fr: 'Chronique', en: 'Column' },
   'sector.autre': { fr: 'Autre', en: 'Other' },
 
   'header.search': { fr: 'Rechercher...', en: 'Search...' },
@@ -239,8 +240,8 @@ const DICTIONARY: TranslationDict = {
     en: '© 2026 Headlines. All rights reserved.',
   },
   'footer.tagline': {
-    fr: 'Le premier journal en ligne 100% dédié à l\'actualité de Madagascar.',
-    en: 'The first online newspaper 100% dedicated to Madagascar news.',
+    fr: 'Votre journal en ligne dédié à l\'actualité de Madagascar.',
+    en: 'Your online newspaper dedicated to Madagascar news.',
   },
   'footer.newsletter_text': {
     fr: 'Recevez chaque matin l\'essentiel de l\'actualité malgache.',

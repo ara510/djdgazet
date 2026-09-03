@@ -11,6 +11,7 @@ export const SECTOR_COLORS: Record<string, string> = {
   tourisme:      '#00897B', // turquoise
   mines:         '#6D4C41', // brun
   telecoms:      '#0288D1', // bleu ciel
+  chronique:     '#C2185B', // framboise
   autre:         '#607D8B', // gris bleuté
 };
 

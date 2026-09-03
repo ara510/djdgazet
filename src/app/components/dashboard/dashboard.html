@@ -427,7 +427,7 @@
                   }
                 </h3>
                 @if (item.author) { <p class="dash-card__author">{{ fr ? 'Par' : 'By' }} {{ item.author }}</p> }
-                @if (item.excerpt) { <p class="dash-card__excerpt recap__fact-text" [innerHTML]="formatRecapText(item.excerpt)"></p> }
+                @if (item.excerpt) { <p class="dash-card__excerpt recap__fact-text" [class.text-justify]="item.justify" [innerHTML]="formatRecapText(item.excerpt)"></p> }
 
                 <!-- Bas de carte : types de source, secteurs/tags, ton, source, date -->
                 <div class="dash-card__meta dash-card__meta--foot">
@@ -524,7 +524,7 @@
                     </button>
                   </div>
 
-                  @if (item.excerpt) { <p class="feed-card__excerpt recap__fact-text" [innerHTML]="formatRecapText(item.excerpt)"></p> }
+                  @if (item.excerpt) { <p class="feed-card__excerpt recap__fact-text" [class.text-justify]="item.justify" [innerHTML]="formatRecapText(item.excerpt)"></p> }
 
                   @if (item.video) {
                     <div class="feed-card__video">
@@ -963,6 +963,10 @@
             <button type="button" class="recap-fmt__btn recap-fmt__btn--mark" (click)="wrapText(excerptArea, 'mark')" [attr.title]="fr ? 'Surligner' : 'Highlight'"><span>H</span></button>
           </div>
           <textarea #excerptArea class="dash-field__input dash-field__textarea" rows="7" [(ngModel)]="form.excerpt" (paste)="cleanPasteExcerpt($event)" [placeholder]="fr ? 'Le fait clé en quelques lignes… (sélectionnez du texte puis B / I / H)' : 'The key fact in a few lines… (select text then B / I / H)'"></textarea>
+          <label class="flex items-center gap-2 mt-2 text-sm text-gazety-dark cursor-pointer select-none">
+            <input type="checkbox" [(ngModel)]="form.justify" class="h-4 w-4 accent-gazety-red cursor-pointer" />
+            {{ fr ? 'Texte justifié' : 'Justify text' }}
+          </label>
         </div>
 
         @if (form.category === 'weekly') {
@@ -1214,7 +1218,7 @@
 
       <div class="dash-detail__body">
         <h2 class="dash-detail__title">{{ cardHeading(item) }}</h2>
-        @if (item.excerpt) { <p class="dash-detail__excerpt recap__fact-text" [innerHTML]="formatRecapText(item.excerpt)"></p> }
+        @if (item.excerpt) { <p class="dash-detail__excerpt recap__fact-text" [class.text-justify]="item.justify" [innerHTML]="formatRecapText(item.excerpt)"></p> }
 
         @if (item.category === 'weekly') {
           @if (item.trends) {

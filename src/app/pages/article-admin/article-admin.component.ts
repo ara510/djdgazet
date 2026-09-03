@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
@@ -10,7 +10,7 @@ import { ArticleService, ArticleItem } from '../../services/article.service';
 import { isoToFr, frToIso } from '../../utils/date-fr';
 import { RichEditorComponent } from '../../components/rich-editor/rich-editor.component';
 
-const SECTORS = ['politique', 'economie', 'international', 'social', 'environnement', 'agriculture', 'tourisme', 'mines', 'telecoms', 'autre'];
+const SECTORS = ['politique', 'economie', 'international', 'social', 'environnement', 'agriculture', 'tourisme', 'mines', 'telecoms', 'chronique', 'autre'];
 
 @Component({
   selector: 'app-article-admin',
@@ -24,6 +24,8 @@ export class ArticleAdminComponent {
   private readonly toast = inject(ToastService);
   private readonly articlesSvc = inject(ArticleService);
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly sectors = SECTORS;
   readonly fr = computed(() => this.i18n.isFrench());
@@ -55,7 +57,33 @@ export class ArticleAdminComponent {
   readonly fImagePosition = signal('50% 50%'); // cadrage (object-position) de la photo principale
 
   constructor() {
-    this.reload();
+    // La liste et le formulaire sont désormais des PAGES distinctes (routes) :
+    //  /gestion-articles            → liste
+    //  /gestion-articles/nouveau    → formulaire de création
+    //  /gestion-articles/:id/modifier → formulaire d'édition
+    const mode = this.route.snapshot.data['mode'] as 'new' | 'edit' | undefined;
+    if (mode === 'new') {
+      this.newArticle();
+    } else if (mode === 'edit') {
+      this.loadForEdit(Number(this.route.snapshot.paramMap.get('id')));
+    } else {
+      this.reload();
+    }
+  }
+
+  /** Page d'édition ouverte directement (URL) : on charge l'article puis on remplit le formulaire. */
+  private loadForEdit(id: number) {
+    this.loading.set(true);
+    this.articlesSvc.list().subscribe({
+      next: rows => {
+        this.articles.set(rows);
+        this.loading.set(false);
+        const a = rows.find(r => r.id === id);
+        if (a) this.edit(a);
+        else { this.toast.show(this.fr() ? 'Article introuvable.' : 'Article not found.', 'error'); this.router.navigate(['/gestion-articles']); }
+      },
+      error: () => { this.loading.set(false); this.router.navigate(['/gestion-articles']); },
+    });
   }
 
   sectorLabel(s: string): string { return this.i18n.t('sector.' + s); }
@@ -95,7 +123,7 @@ export class ArticleAdminComponent {
     this.formOpen.set(true);
   }
 
-  cancel() { this.formOpen.set(false); }
+  cancel() { this.router.navigate(['/gestion-articles']); }
 
   /** Cadrage de la photo principale : point focal défini au clic/déplacement sur l'aperçu. */
   private clampPct(n: number): number { return Math.max(0, Math.min(100, Math.round(n))); }
@@ -170,9 +198,8 @@ export class ArticleAdminComponent {
     req$.subscribe({
       next: () => {
         this.saving.set(false);
-        this.formOpen.set(false);
         this.toast.show(this.fr() ? 'Article enregistré.' : 'Article saved.', 'success');
-        this.reload();
+        this.router.navigate(['/gestion-articles']); // retour à la liste (page distincte)
       },
       error: (e) => { this.saving.set(false); this.toast.show(e.error?.error || (this.fr() ? 'Enregistrement impossible.' : 'Save failed.'), 'error'); },
     });

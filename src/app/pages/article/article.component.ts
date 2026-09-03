@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal, effect } from '@angular/core';
+import { Component, HostListener, inject, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -81,6 +81,16 @@ export class ArticleComponent {
 
   toggleGallery() { this.showGallery.update(v => !v); }
 
+  // ── Visionneuse plein écran de la galerie (photo en grand, fond flou, animation) ──
+  readonly lightbox = signal<number | null>(null);
+  openLightbox(i: number) { this.lightbox.set(i); document.body.style.overflow = 'hidden'; }
+  closeLightbox() { this.lightbox.set(null); document.body.style.overflow = ''; }
+  lbPrev(ev?: Event) { ev?.stopPropagation(); const n = this.galleryImages().length; this.lightbox.update(x => x === null ? x : (x - 1 + n) % n); }
+  lbNext(ev?: Event) { ev?.stopPropagation(); const n = this.galleryImages().length; this.lightbox.update(x => x === null ? x : (x + 1) % n); }
+  @HostListener('document:keydown.escape')     onLbEsc()   { if (this.lightbox() !== null) this.closeLightbox(); }
+  @HostListener('document:keydown.arrowleft')  onLbLeft()  { const n = this.galleryImages().length; if (this.lightbox() !== null && n > 1) this.lbPrev(); }
+  @HostListener('document:keydown.arrowright') onLbRight() { const n = this.galleryImages().length; if (this.lightbox() !== null && n > 1) this.lbNext(); }
+
   sectorLabel(s?: string | null): string { return s ? this.i18n.t('sector.' + s) : ''; }
 
   baDate(value?: string): string {
@@ -116,9 +126,31 @@ export class ArticleComponent {
     });
   }
 
-  copyLink() {
-    const url = window.location.href;
-    const done = () => this.toast.show(this.fr() ? 'Lien copié !' : 'Link copied!', 'success');
+  private shareUrl(): string { return window.location.href; }
+  private shareTitle(): string { return this.backendArticle()?.title || 'Headlines'; }
+  private openShare(url: string) { window.open(url, '_blank', 'noopener,noreferrer,width=640,height=560'); }
+
+  /** Partage Facebook (fenêtre de partage standard). */
+  shareFacebook() {
+    this.openShare('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(this.shareUrl()));
+  }
+  /** Partage X (ex-Twitter) : lien + titre. */
+  shareX() {
+    this.openShare('https://twitter.com/intent/tweet?url=' + encodeURIComponent(this.shareUrl()) + '&text=' + encodeURIComponent(this.shareTitle()));
+  }
+  /** Partage Messenger : lien profond (fonctionne surtout sur mobile avec l'app). */
+  shareMessenger() {
+    this.openShare('fb-messenger://share/?link=' + encodeURIComponent(this.shareUrl()));
+  }
+  /** Instagram n'accepte pas de partage de lien par URL : on copie le lien et on ouvre Instagram. */
+  shareInstagram() {
+    this.copyLink(this.fr() ? 'Lien copié — collez-le dans votre story ou message Instagram.' : 'Link copied — paste it into your Instagram story or message.');
+    this.openShare('https://www.instagram.com/');
+  }
+
+  copyLink(msg?: string) {
+    const url = this.shareUrl();
+    const done = () => this.toast.show(msg || (this.fr() ? 'Lien copié !' : 'Link copied!'), 'success');
     const fail = () => this.toast.show(this.fr() ? 'Copie impossible.' : 'Copy failed.', 'error');
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(url).then(done, fail);

@@ -24,13 +24,19 @@ import { I18nService } from '../../services/i18n.service';
             <span class="text-gazety-accent">{{ i18n.isFrench() ? 'À la une' : 'Headlines' }}</span>
           </div>
           <div class="flex-1 overflow-hidden">
-            <div class="flex gap-12 animate-marquee whitespace-nowrap text-sm">
-              @for (item of items(); track $index) {
-                <span class="shrink-0"><span class="text-gazety-accent font-bold mr-2">●</span>{{ item }}</span>
-              }
-              @for (item of items(); track $index) {
-                <span class="shrink-0"><span class="text-gazety-accent font-bold mr-2">●</span>{{ item }}</span>
-              }
+            <!-- Deux blocs IDENTIQUES et de largeur égale : translateX(-50%) fait exactement
+                 correspondre le 2e bloc à la place du 1er → boucle continue, sans coupure au milieu. -->
+            <div class="flex w-max animate-marquee whitespace-nowrap text-sm">
+              <div class="flex gap-12 pr-12 shrink-0">
+                @for (item of items(); track $index) {
+                  <span class="shrink-0"><span class="text-gazety-accent font-bold mr-2">●</span>{{ item }}</span>
+                }
+              </div>
+              <div class="flex gap-12 pr-12 shrink-0" aria-hidden="true">
+                @for (item of items(); track $index) {
+                  <span class="shrink-0"><span class="text-gazety-accent font-bold mr-2">●</span>{{ item }}</span>
+                }
+              </div>
             </div>
           </div>
         </div>

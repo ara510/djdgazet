@@ -23,6 +23,7 @@ interface SectorVeille {
   image?: string | null;
   images_count?: number;
   published_at?: string;
+  justify?: boolean;
   locked: boolean;
   tier: 'sectorielle' | 'dediee';
 }
@@ -162,6 +163,11 @@ export class SectorComponent {
   typesOf(v: SectorVeille): string[] {
     return (v.source_types?.length ? v.source_types : (v.source_type ? [v.source_type] : [])).filter(Boolean) as string[];
   }
+
+  /** Veille « presse » = aucun type web/réseau social. */
+  isPresse(v: SectorVeille): boolean { const t = this.typesOf(v); return !t.some(x => x === 'web' || x === 'social'); }
+  /** Coupure de journal floutée : visiteur non connecté + veille presse avec image. */
+  blurPresse(v: SectorVeille): boolean { return !this.loggedIn() && this.isPresse(v) && !!v.image; }
 
   /** Réseaux sociaux de la veille (tableau, avec repli sur le champ unique). */
   networksOf(v: SectorVeille): string[] {

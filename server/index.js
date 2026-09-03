@@ -204,6 +204,20 @@ db.query(`UPDATE users SET plan = 'dediee'      WHERE plan = 'premium'`).catch((
 db.query(`ALTER TABLE users DROP COLUMN IF EXISTS phone_verified`).catch(() => {});
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
 db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
+// Verrou « admin permanent » : mis à TRUE pour les comptes créés via un lien d'invitation admin.
+// Ces comptes ne sont JAMAIS rétrogradés par la synchro de domaine ci-dessous, même si leur email
+// n'est pas du domaine de la marque. C'est ce qui rend l'admin réellement permanent.
+db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_locked BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
+// Liens d'invitation admin (à usage unique) : chaque token consommé promeut le compte en admin permanent.
+db.query(`
+  CREATE TABLE IF NOT EXISTS admin_invites (
+    token      TEXT PRIMARY KEY,
+    label      TEXT,
+    used_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    used_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`).catch(() => {});
 // Admin = email du domaine de la marque (configurable via .env). Synchronise les comptes existants.
 const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour.com').toLowerCase();
 // Admins permanents par identifiant (comptes hors domaine) : re-promus à chaque boot ET
@@ -211,7 +225,7 @@ const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour
 const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8'];
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE $1 AND is_admin = FALSE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(username) = ANY($1) AND is_admin = FALSE`, [BOOT_ADMIN_USERNAMES]).catch(() => {});
-db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND LOWER(username) <> ALL($2) AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN, BOOT_ADMIN_USERNAMES]).catch(() => {});
+db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND LOWER(username) <> ALL($2) AND admin_locked = FALSE AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN, BOOT_ADMIN_USERNAMES]).catch(() => {});
 db.query(`
   CREATE TABLE IF NOT EXISTS veille_items (
     id             SERIAL PRIMARY KEY,
@@ -249,6 +263,7 @@ db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS signals TEXT`).catch
 db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS social_networks TEXT[]`).catch(() => {}); // plusieurs réseaux sociaux par veille
 db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS tags TEXT[]`).catch(() => {}); // Générale : actualite / fait_marquant (pas des secteurs)
 db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS media_dediee BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {}); // médias (photo/vidéo/lien) réservés à la Dédiée
+db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS justify BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {}); // texte de l'extrait justifié (l'article gère la justification dans son HTML)
 db.query(`UPDATE veille_items SET social_networks = ARRAY[social_network] WHERE social_networks IS NULL AND social_network IS NOT NULL`).catch(() => {});
 db.query(`ALTER TABLE veille_items ADD COLUMN IF NOT EXISTS sources TEXT[]`).catch(() => {});
 db.query(`UPDATE veille_items SET sources = ARRAY[source] WHERE sources IS NULL AND source IS NOT NULL`).catch(() => {});
@@ -469,7 +484,8 @@ function logActivity(req, action, target) {
 
 // ─── POST /api/auth/register ───────────────────────────────────────────────────
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  let { nom, prenoms, date_naissance, email, username, password } = req.body;
+  let { nom, prenoms, date_naissance, email, username, password, admin_invite } = req.body;
+  admin_invite = cleanStr(admin_invite, 100);
   nom      = cleanStr(nom, 100);
   prenoms  = cleanStr(prenoms, 100);
   email    = cleanStr(email, 254);
@@ -501,12 +517,26 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (emailCheck.rows.length)    return res.status(409).json({ error: 'Cet email est déjà utilisé.' });
     if (usernameCheck.rows.length) return res.status(409).json({ error: 'Ce nom d\'utilisateur est déjà pris.' });
 
+    // Lien d'invitation admin : si un token est fourni, il doit exister et être encore non utilisé.
+    let inviteAdmin = false;
+    if (admin_invite) {
+      const inv = await db.query('SELECT token FROM admin_invites WHERE token = $1 AND used_by IS NULL', [admin_invite]);
+      if (!inv.rows.length)
+        return res.status(400).json({ error: 'Lien d\'invitation invalide ou déjà utilisé.' });
+      inviteAdmin = true;
+    }
+    const isAdmin = isDjdEmail(email) || inviteAdmin;
+
     const hash = await bcrypt.hash(password, 12);
     const { rows } = await db.query(
-      'INSERT INTO users (nom, prenoms, date_naissance, email, username, password_hash, terms_accepted, is_admin) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, nom, prenoms, email, username, date_naissance, avatar, telephone, pays, ville, genre, notif_email, email_verified, plan, is_admin, created_at, deleted_at',
-      [nom, prenoms, date_naissance, email, username, hash, true, isDjdEmail(email)]
+      'INSERT INTO users (nom, prenoms, date_naissance, email, username, password_hash, terms_accepted, is_admin, admin_locked) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, nom, prenoms, email, username, date_naissance, avatar, telephone, pays, ville, genre, notif_email, email_verified, plan, is_admin, created_at, deleted_at',
+      [nom, prenoms, date_naissance, email, username, hash, true, isAdmin, inviteAdmin]
     );
     const user  = rows[0];
+    // Consomme le jeton d'invitation (usage unique) une fois le compte créé.
+    if (inviteAdmin) {
+      await db.query('UPDATE admin_invites SET used_by = $1, used_at = now() WHERE token = $2 AND used_by IS NULL', [user.id, admin_invite]);
+    }
     const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ token, user });
   } catch (err) {
@@ -1439,7 +1469,7 @@ app.post('/api/chat/conversations/:id/messages', requireAuth, requireAdmin, asyn
 // ─── Veille (dashboard) ───────────────────────────────────────────────────────
 const VEILLE_TYPES    = ['web', 'social', 'radio', 'tv', 'presse', 'institution'];
 const SOCIAL_NETWORKS = ['facebook', 'youtube', 'instagram', 'x', 'linkedin'];
-const VEILLE_SECTORS  = ['politique','economie','international','social','environnement','agriculture','tourisme','mines','telecoms','autre'];
+const VEILLE_SECTORS  = ['politique','economie','international','social','environnement','agriculture','tourisme','mines','telecoms','chronique','autre'];
 // Tags de la Veille Générale (gratuite) : ce ne sont pas des secteurs, mais des catégories de publication.
 const VEILLE_TAGS = ['actualite', 'fait_marquant'];
 
@@ -1449,7 +1479,7 @@ const VEILLE_TAGS = ['actualite', 'fait_marquant'];
 const PLAN_LEVEL = { generale: 0, sectorielle: 1, dediee: 2 };
 const SECTOR_MIN_LEVEL = {
   politique: 1, economie: 1, international: 1, social: 1, autre: 1,
-  environnement: 1, agriculture: 1, tourisme: 1, mines: 1, telecoms: 1,
+  environnement: 1, agriculture: 1, tourisme: 1, mines: 1, telecoms: 1, chronique: 1,
 };
 const sectorsForLevel = (level) =>
   VEILLE_SECTORS.filter(s => (SECTOR_MIN_LEVEL[s] ?? 1) <= level);
@@ -1557,7 +1587,7 @@ app.get('/api/veille', requireAuth, async (req, res) => {
 
     const { rows } = await db.query(
       `SELECT vi.id, vi.title, vi.source, vi.sources, vi.source_type, vi.source_types, vi.social_network, vi.social_networks, vi.sector, vi.sectors, vi.tone, vi.url, vi.urls, vi.excerpt, vi.image, vi.images, vi.video, vi.author,
-              vi.category, vi.trends, vi.signals, vi.tags, vi.media_dediee,
+              vi.category, vi.trends, vi.signals, vi.tags, vi.media_dediee, vi.justify,
               COALESCE(array_length(vi.images, 1), 0) AS images_count,
               (vi.video IS NOT NULL) AS has_video,
               vi.status, vi.pinned, vi.published_at, ${scheduledSql('vi.published_at')} AS scheduled, vi.created_at,
@@ -1676,7 +1706,7 @@ async function readHomeVeilleSettings() {
 
 // Champs complets d'une veille pour l'affichage « en intégralité » sur l'accueil.
 const HOME_VEILLE_SELECT = `id, title, source, sources, source_type, source_types, social_network, social_networks,
-  sector, sectors, tags, tone, url, urls, excerpt, image, images, author, media_dediee, video,
+  sector, sectors, tags, tone, url, urls, excerpt, image, images, author, media_dediee, justify, video,
   COALESCE(array_length(images, 1), 0) AS images_count, (video IS NOT NULL) AS has_video, published_at`;
 
 // Verrou teaser sur l'accueil. Une veille rattachée à un secteur = contenu payant :
@@ -1863,7 +1893,7 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
     const baseWhere = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')}`;
     const { rows } = await db.query(
       `SELECT id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, excerpt,
-              image, COALESCE(array_length(images, 1), 0) AS images_count, media_dediee, published_at
+              image, COALESCE(array_length(images, 1), 0) AS images_count, media_dediee, justify, published_at
        FROM veille_items
        WHERE ${baseWhere} AND $1 = ANY(sectors)
        ORDER BY pinned DESC, published_at DESC, id DESC LIMIT 60`,
@@ -1897,6 +1927,7 @@ app.get('/api/veille/sector/:sector', optionalAuth, async (req, res) => {
         image: canMedia ? (r.image || null) : null,
         images_count: canMedia ? Number(r.images_count || 0) : 0,
         published_at: r.published_at,
+        justify: r.justify,
         locked: !(isAdmin || level >= required || (quota && (quota.readIds.includes(r.id) || quota.remaining > 0))),
         tier,
       };
@@ -1943,7 +1974,7 @@ app.get('/api/veille/:id', requireAuth, async (req, res) => {
     const isAdmin = u.rows[0]?.is_admin;
     const { rows } = await db.query(
       `SELECT id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author,
-              category, trends, signals, tags, media_dediee,
+              category, trends, signals, tags, media_dediee, justify,
               status, pinned, published_at, ${scheduledSql('published_at')} AS scheduled, created_at
        FROM veille_items WHERE id = $1`,
       [req.params.id]
@@ -2074,7 +2105,7 @@ app.post('/api/upload', requireAuth, requireAdmin, upload.array('files', 10), (r
 
 // POST /api/veille — créer (admin DJD)
 app.post('/api/veille', requireAuth, requireAdmin, async (req, res) => {
-  let { title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, published_at, status, pinned, category, trends, signals, tags, media_dediee } = req.body;
+  let { title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, published_at, status, pinned, category, trends, signals, tags, media_dediee, justify } = req.body;
   const types = normalizeTypes(source_types, source_type);
   if (!types.length) return res.status(400).json({ error: 'Au moins un type de source est requis.' });
   const sectorsArr = normalizeSectors(sectors, sector);
@@ -2099,10 +2130,10 @@ app.post('/api/veille', requireAuth, requireAdmin, async (req, res) => {
   const signalsVal = cat === 'weekly' ? (signals?.trim() || null) : null;
   try {
     const { rows } = await db.query(
-      `INSERT INTO veille_items (title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, status, pinned, published_at, category, trends, signals, tags, media_dediee, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$26,$12,$13,$14,$15,$16,$17,$18,COALESCE($19, NOW()),$20,$21,$22,$23,$24,$25)
-       RETURNING id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, video, author, status, pinned, published_at, ${scheduledSql('published_at')} AS scheduled, category, trends, signals, tags, media_dediee, created_at`,
-      [title?.trim() || null, srcJoined, srcArr, primary, types, netPrimary, netsArr, sectorPrimary, sectorsArr.length ? sectorsArr : null, toneVal, urlPrimary, excerpt || null, imgPrimary, imgArr, video || null, authorVal, status, !!pinned, normalizePublishedAt(published_at), cat, trendsVal, signalsVal, tagsArr, !!media_dediee, req.user.id, urlArr.length ? urlArr : null]
+      `INSERT INTO veille_items (title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, status, pinned, published_at, category, trends, signals, tags, media_dediee, created_by, justify)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$26,$12,$13,$14,$15,$16,$17,$18,COALESCE($19, NOW()),$20,$21,$22,$23,$24,$25,$27)
+       RETURNING id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, video, author, status, pinned, published_at, ${scheduledSql('published_at')} AS scheduled, category, trends, signals, tags, media_dediee, justify, created_at`,
+      [title?.trim() || null, srcJoined, srcArr, primary, types, netPrimary, netsArr, sectorPrimary, sectorsArr.length ? sectorsArr : null, toneVal, urlPrimary, excerpt || null, imgPrimary, imgArr, video || null, authorVal, status, !!pinned, normalizePublishedAt(published_at), cat, trendsVal, signalsVal, tagsArr, !!media_dediee, req.user.id, urlArr.length ? urlArr : null, !!justify]
     );
     logActivity(req, 'veille.create', rows[0].source);
     res.status(201).json(rows[0]);
@@ -2114,7 +2145,7 @@ app.post('/api/veille', requireAuth, requireAdmin, async (req, res) => {
 
 // PATCH /api/veille/:id — modifier (admin DJD)
 app.patch('/api/veille/:id', requireAuth, requireAdmin, async (req, res) => {
-  let { title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, published_at, status, pinned, category, trends, signals, tags, media_dediee } = req.body;
+  let { title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, images, video, author, published_at, status, pinned, category, trends, signals, tags, media_dediee, justify } = req.body;
   const types = normalizeTypes(source_types, source_type);
   if (!types.length) return res.status(400).json({ error: 'Au moins un type de source est requis.' });
   const sectorsArr = normalizeSectors(sectors, sector);
@@ -2140,10 +2171,10 @@ app.patch('/api/veille/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const before = await db.query('SELECT images, video FROM veille_items WHERE id = $1', [req.params.id]);
     const { rows } = await db.query(
-      `UPDATE veille_items SET title=$1, source=$2, sources=$3, source_type=$4, source_types=$5, social_network=$6, social_networks=$23, sector=$7, sectors=$8, tone=$9, url=$10, urls=$26, excerpt=$11, image=$12, images=$13, video=$14, author=$15, status=$16, pinned=$17, published_at=COALESCE($18, published_at), category=$20, trends=$21, signals=$22, tags=$24, media_dediee=$25
+      `UPDATE veille_items SET title=$1, source=$2, sources=$3, source_type=$4, source_types=$5, social_network=$6, social_networks=$23, sector=$7, sectors=$8, tone=$9, url=$10, urls=$26, excerpt=$11, image=$12, images=$13, video=$14, author=$15, status=$16, pinned=$17, published_at=COALESCE($18, published_at), category=$20, trends=$21, signals=$22, tags=$24, media_dediee=$25, justify=$27
        WHERE id=$19
-       RETURNING id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, video, author, status, pinned, published_at, ${scheduledSql('published_at')} AS scheduled, category, trends, signals, tags, media_dediee, created_at`,
-      [title?.trim() || null, srcJoined, srcArr, primary, types, netPrimary, sectorPrimary, sectorsArr.length ? sectorsArr : null, toneVal, urlPrimary, excerpt || null, imgPrimary, imgArr, video || null, authorVal, status, !!pinned, normalizePublishedAt(published_at), req.params.id, cat, trendsVal, signalsVal, netsArr, tagsArr, !!media_dediee, urlArr.length ? urlArr : null]
+       RETURNING id, title, source, sources, source_type, source_types, social_network, social_networks, sector, sectors, tone, url, urls, excerpt, image, video, author, status, pinned, published_at, ${scheduledSql('published_at')} AS scheduled, category, trends, signals, tags, media_dediee, justify, created_at`,
+      [title?.trim() || null, srcJoined, srcArr, primary, types, netPrimary, sectorPrimary, sectorsArr.length ? sectorsArr : null, toneVal, urlPrimary, excerpt || null, imgPrimary, imgArr, video || null, authorVal, status, !!pinned, normalizePublishedAt(published_at), req.params.id, cat, trendsVal, signalsVal, netsArr, tagsArr, !!media_dediee, urlArr.length ? urlArr : null, !!justify]
     );
     if (!rows.length) return res.status(404).json({ error: 'Veille introuvable.' });
     // Médias retirés lors de l'édition → corbeille fichiers
@@ -2488,15 +2519,12 @@ app.get('/api/articles/:id', optionalAuth, async (req, res) => {
       [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Article introuvable.' });
     const article = rows[0];
+    // Articles = grand public : lecture complète pour tout le monde, sans compte.
+    article.description = sanitizeRichHtml(article.description); // filet de sécurité au rendu
+    article.locked = false;
     if (req.user) {
       const f = await db.query('SELECT 1 FROM article_favorites WHERE user_id=$1 AND article_id=$2', [req.user.id, article.id]);
       article.favorite = f.rows.length > 0;
-      article.description = sanitizeRichHtml(article.description); // filet de sécurité au rendu (contenu existant inclus)
-    } else {
-      // Visiteur sans compte : aperçu seulement (titre + quelques lignes), lecture complète = compte requis.
-      const plain = (article.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      article.description = plain.slice(0, 400);
-      article.locked = true;
     }
     res.json(article);
   } catch (err) { console.error('Article get error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
@@ -2556,6 +2584,60 @@ app.get('/api/favorites', requireAuth, async (req, res) => {
        WHERE vs.user_id = $1 AND vs.favorite = TRUE AND vi.deleted_at IS NULL ORDER BY vi.published_at DESC`, [req.user.id]);
     res.json({ articles: arts.rows, veilles: veilles.rows });
   } catch (err) { console.error('Favorites error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// ─── Sitemap XML dynamique (SEO) ──────────────────────────────────────────────
+// Sert /sitemap.xml : pages statiques + secteurs + tous les articles publiés.
+// Base = APP_URL (https://mg-headlines.com en prod). Toujours à jour (pas de rebuild).
+app.get('/sitemap.xml', async (req, res) => {
+  const BASE = (APP_URL || '').replace(/\/+$/, '');
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const iso = (d) => (d ? new Date(d).toISOString() : new Date().toISOString());
+  const urls = [];
+  const add = (loc, lastmod, changefreq, priority) =>
+    urls.push({ loc: BASE + loc, lastmod, changefreq, priority });
+
+  // Pages statiques publiques (la page /confidentialite est volontairement exclue de la prod)
+  add('/',                 iso(), 'hourly', '1.0');
+  add('/abonnements',      null,  'monthly', '0.6');
+  add('/a-propos',         null,  'yearly',  '0.4');
+  add('/contact',          null,  'yearly',  '0.4');
+  add('/fil/actualite',    iso(), 'hourly',  '0.8');
+  add('/fil/fait-marquant',iso(), 'hourly',  '0.8');
+  add('/mentions-legales', null,  'yearly',  '0.2');
+  add('/cgu',              null,  'yearly',  '0.2');
+  for (const s of VEILLE_SECTORS) {
+    if (s === 'autre') continue;
+    add('/secteur/' + s, iso(), 'daily', '0.7');
+  }
+
+  try {
+    const { rows } = await db.query(
+      `SELECT id, published_at, created_at FROM articles
+       WHERE deleted_at IS NULL ORDER BY published_at DESC, id DESC LIMIT 5000`);
+    for (const a of rows) {
+      add('/article/' + a.id, iso(a.published_at || a.created_at), 'weekly', '0.8');
+    }
+  } catch (err) {
+    console.error('Sitemap error:', err); // on sert quand même les pages statiques
+  }
+
+  const body =
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    urls.map(u =>
+      '  <url>\n' +
+      `    <loc>${esc(u.loc)}</loc>\n` +
+      (u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>\n` : '') +
+      (u.changefreq ? `    <changefreq>${u.changefreq}</changefreq>\n` : '') +
+      (u.priority ? `    <priority>${u.priority}</priority>\n` : '') +
+      '  </url>'
+    ).join('\n') +
+    '\n</urlset>\n';
+
+  res.set('Content-Type', 'application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(body);
 });
 
 // ─── Servir le front Angular en production ────────────────────────────────────

@@ -5,8 +5,61 @@
   <title>Headlines — Actualités de Madagascar</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Le premier journal en ligne dédié à l'actualité malgache. Politique, économie, culture, sport et plus.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Votre journal en ligne dédié à l'actualité malgache. Politique, économie, culture, sport et plus.">
+  <!-- Thème sombre appliqué AVANT le premier rendu (évite le flash blanc au chargement). -->
+  <script>
+    (function () {
+      try {
+        var s = localStorage.getItem('hl-theme');
+        var dark = s === 'dark' || (!s && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) { document.documentElement.classList.add('dark'); document.documentElement.style.colorScheme = 'dark'; }
+      } catch (e) {}
+    })();
+  </script>
+  <meta name="msvalidate.01" content="EB59F52C0A0BC802FC00A514F0BC1765" />
   <link rel="icon" type="image/png" href="assets/haydlines-logo.png">
+
+  <!-- SEO / partage social (valeurs par défaut = accueil ; surchargées par page dans un 2e temps) -->
+  <meta property="og:site_name" content="MG Headlines">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_MG">
+  <meta property="og:title" content="MG Headlines — Actualités de Madagascar">
+  <meta property="og:description" content="Votre journal en ligne dédié à l'actualité malgache. Politique, économie, culture, sport et plus.">
+  <meta property="og:url" content="https://mg-headlines.com/">
+  <meta property="og:image" content="https://mg-headlines.com/assets/haydlines-logo.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MG Headlines — Actualités de Madagascar">
+  <meta name="twitter:description" content="Votre journal en ligne dédié à l'actualité malgache.">
+  <meta name="twitter:image" content="https://mg-headlines.com/assets/haydlines-logo.png">
+
+  <!-- Donnees structurees : identite du media pour Google (panneau de marque) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "NewsMediaOrganization",
+        "@id": "https://mg-headlines.com/#organization",
+        "name": "MG Headlines",
+        "alternateName": "Headlines",
+        "url": "https://mg-headlines.com/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://mg-headlines.com/assets/haydlines-logo.png"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://mg-headlines.com/#website",
+        "url": "https://mg-headlines.com/",
+        "name": "MG Headlines",
+        "inLanguage": "fr",
+        "publisher": { "@id": "https://mg-headlines.com/#organization" }
+      }
+    ]
+  }
+  </script>
   <!-- Polices auto-hébergées (Inter, Playfair Display, Cormorant Garamond, Poppins) —
        latin + latin-ext, graisses réellement utilisées. Plus de dépendance à Google Fonts.
        Chargé en ASYNCHRONE (non bloquant) : le texte s'affiche immédiatement (font-display:swap),
@@ -14,7 +67,7 @@
   <link rel="stylesheet" href="assets/fonts/fonts.css" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="assets/fonts/fonts.css"></noscript>
 </head>
-<body class="bg-white text-gazety-dark antialiased">
+<body class="bg-white text-gazety-dark antialiased dark:bg-[#0f1420] dark:text-[#dfe4ec]">
   <app-root></app-root>
 </body>
 </html>

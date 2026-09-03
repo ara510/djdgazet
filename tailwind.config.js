@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{html,ts}"],
   theme: {
     extend: {
@@ -51,7 +52,7 @@ module.exports = {
         display: ['"Playfair Display"', '"Georgia"', "serif"],
       },
       animation: {
-        "marquee": "marquee 40s linear infinite",
+        "marquee": "marquee 30s linear infinite",
         "fade-in": "fadeIn 0.4s ease-out",
         "slide-up": "slideUp 0.5s ease-out",
       },

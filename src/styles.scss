@@ -13,6 +13,7 @@
   --color-accent:     #1E5FD4;
   --color-accent-lt:  #4B83EA;
   --color-border:     #DFE4EC;
+  --color-tint:       rgba(26, 25, 22, 0.04); /* fond translucide subtil (hover, bulle) — bascule en sombre */
   --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-body:    'Inter', system-ui, sans-serif;
   --section-pad: clamp(5rem, 10vw, 9rem);
@@ -114,4 +115,119 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
+}
+
+/* ── Contenu riche des articles (.article-richtext) ───────────────────────────────
+   Rendu « prose » pour le HTML produit par l'éditeur (app-rich-editor) : Tailwind
+   preflight remet listes/titres à zéro, on rétablit ici un style d'article lisible.
+   Utilisé à la fois dans l'éditeur (WYSIWYG) et sur la page article. Tailles en em
+   → s'adapte que le conteneur soit en text-sm (éditeur) ou text-lg (article). */
+.article-richtext {
+  h1, h2, h3, h4 { font-family: "Playfair Display", "Georgia", serif; font-weight: 800; line-height: 1.25; margin: 1.4em 0 .5em; color: #1d1d1f; }
+  h1 { font-size: 1.9em; }
+  h2 { font-size: 1.55em; }
+  h3 { font-size: 1.28em; }
+  h4 { font-size: 1.1em; }
+  p { margin: 0 0 1em; }
+  ul, ol { margin: 0 0 1em; padding-left: 1.6em; }
+  ul { list-style: disc; }
+  ol { list-style: decimal; }
+  li { margin: .3em 0; }
+  li > ul, li > ol { margin: .3em 0 .3em; }
+  blockquote { margin: 1.2em 0; padding: .5em 1.1em; border-left: 3px solid #B23A2E; background: #f8f8f7; color: #52525b; font-style: italic; }
+  blockquote p:last-child { margin-bottom: 0; }
+  a { color: #B23A2E; text-decoration: underline; }
+  strong, b { font-weight: 700; }
+  em, i { font-style: italic; }
+  u { text-decoration: underline; }
+  s, strike { text-decoration: line-through; }
+  mark { background: #fde68a; padding: 0 .15em; border-radius: 2px; }
+  sub { vertical-align: sub; font-size: .8em; }
+  sup { vertical-align: super; font-size: .8em; }
+  img { max-width: 100%; height: auto; border-radius: 4px; margin: .5em 0; }
+  hr { border: none; border-top: 1px solid #e2e5e9; margin: 1.5em 0; }
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+}
+
+/* Animation d'ouverture de la visionneuse photo (article) : léger zoom + fondu. */
+@keyframes lbZoom { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+.lb-zoom { animation: lbZoom .22s ease-out; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MODE SOMBRE — couche de thème (B10 / A demande).
+   Le site utilise massivement des utilitaires Tailwind à palette fixe (bg-white,
+   text-gazety-dark, border-silver-*, …). Plutôt que d'ajouter `dark:` sur des
+   centaines de classes, on redéfinit ici ces utilitaires sous `html.dark`.
+   Couvre les surfaces principales (fonds, textes, bordures, cartes, en-tête,
+   modales, scrollbar, contenu d'article). Des retouches ponctuelles par page
+   restent possibles au besoin.
+   ══════════════════════════════════════════════════════════════════════════════ */
+html.dark {
+  --color-bg:        #0f1420;
+  --color-surface:   #171d2b;
+  --color-ink:       #e7ebf2;
+  --color-ink-muted: #8b95a7;
+  --color-border:    #2a3242;
+  --color-tint:      rgba(255, 255, 255, 0.06);
+  color-scheme: dark;
+
+  body { background-color: #0f1420; color: #dfe4ec; }
+
+  /* Surfaces */
+  .bg-white        { background-color: #171d2b !important; }
+  .bg-silver-50    { background-color: #131826 !important; }
+  .bg-silver-100   { background-color: #1e2536 !important; }
+  .bg-silver-50\/70, .hover\:bg-silver-50\/70:hover { background-color: #1a2130 !important; }
+  .hover\:bg-silver-100:hover { background-color: #232b3b !important; }
+  .bg-gazety-dark\/5 { background-color: rgba(255,255,255,.06) !important; }
+
+  /* Textes */
+  .text-gazety-dark { color: #e7ebf2 !important; }
+  .text-silver-700  { color: #c4ccd8 !important; }
+  .text-silver-600  { color: #aeb7c5 !important; }
+  .text-silver-500  { color: #8b95a7 !important; }
+  .text-silver-400  { color: #737e91 !important; }
+  .text-silver-300  { color: #5a6376 !important; }
+
+  /* Bordures */
+  .border-silver-100 { border-color: #232b3b !important; }
+  .border-silver-200 { border-color: #2a3242 !important; }
+  .border-silver-300 { border-color: #333c4e !important; }
+
+  /* En-tête / nav collants restent lisibles */
+  header.bg-white { background-color: #141a26 !important; border-color: #2a3242 !important; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar-track { background: #131826; }
+  ::-webkit-scrollbar-thumb { background: #333c4e; }
+  ::-webkit-scrollbar-thumb:hover { background: #454f63; }
+
+  /* Contenu riche d'article */
+  .article-richtext {
+    h1, h2, h3, h4 { color: #e7ebf2; }
+    blockquote { background: #1a2130; color: #aeb7c5; border-left-color: #1e5fd4; }
+    hr { border-top-color: #2a3242; }
+  }
+
+  /* Tuiles qui DOIVENT rester blanches même en sombre (fond derrière un logo foncé). */
+  .keep-white { background-color: #fff !important; }
+
+  /* Surlignage jaune : garder un texte foncé pour rester lisible en sombre. */
+  mark { color: #1c2637; }
+}
+
+/* ── Micro-interaction « feedback au clic » (B5) : léger enfoncement au tap ─────
+   Appliqué aux cartes/boutons cliquables du site. Désactivé si l'utilisateur
+   préfère moins d'animations. */
+@media (prefers-reduced-motion: no-preference) {
+  .tap-press { transition: transform .12s ease, box-shadow .12s ease; }
+  .tap-press:active { transform: scale(.985); }
+}
+
+/* ── Focus visible cohérent (accessibilité / B10) ─────────────────────────────── */
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid #1e5fd4;
+  outline-offset: 2px;
+  border-radius: 3px;
 }

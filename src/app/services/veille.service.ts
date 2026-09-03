@@ -40,6 +40,7 @@ export interface VeilleItem {
   read?: boolean;
   locked?: boolean;           // accueil : teaser verrouillé (veille sectorielle payante)
   media_locked?: boolean;     // accueil : médias réservés à la Dédiée (photo/liens retirés)
+  justify?: boolean;          // extrait affiché en texte justifié
 }
 
 export interface VeilleFilters {

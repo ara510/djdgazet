@@ -2,6 +2,7 @@ import { Component, signal, inject, output, Input, AfterViewInit, ElementRef, Vi
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
+import { AuthModalService } from '../../services/auth-modal.service';
 import { ToastService } from '../../services/toast.service';
 import { TranslationService } from '../../services/translation.service';
 import { PrivacyService } from '../../services/privacy.service';
@@ -21,8 +22,9 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
   @ViewChild('lottieContainer') lottieRef!: ElementRef<HTMLDivElement>;
   @ViewChild('authLoadingLottie') authLoadingRef!: ElementRef<HTMLDivElement>;
 
-  auth    = inject(AuthService);
-  toast   = inject(ToastService);
+  auth      = inject(AuthService);
+  authModal = inject(AuthModalService);
+  toast     = inject(ToastService);
   lang    = inject(TranslationService);
   privacy = inject(PrivacyService);
 
@@ -149,7 +151,8 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
     this.loadAnim?.play();
     const start = Date.now();
     const { passwordConfirm, acceptTerms, ...rest } = this.signup;
-    const payload = { ...rest, date_naissance: dobIso };
+    const invite = this.authModal.inviteToken();
+    const payload = { ...rest, date_naissance: dobIso, ...(invite ? { admin_invite: invite } : {}) };
     this.auth.register(payload).subscribe({
       next: () => this.finishLoading(() => {
         this.auth.sendEmailOtp().subscribe();

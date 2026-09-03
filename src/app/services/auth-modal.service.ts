@@ -7,6 +7,8 @@ import { Injectable, signal } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class AuthModalService {
   readonly mode = signal<'login' | 'signup' | null>(null);
+  /** Jeton d'invitation admin (lien envoyé au boss). Injecté dans l'inscription si présent. */
+  readonly inviteToken = signal<string | null>(null);
 
   open(mode: 'login' | 'signup' = 'login') {
     this.mode.set(mode);

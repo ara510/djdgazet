@@ -59,6 +59,17 @@ export class AppComponent {
     if (!localStorage.getItem('gazety_cookies')) {
       setTimeout(() => this.showCookieBanner.set(true), 3000);
     }
+
+    // Lien d'invitation admin (?invite=TOKEN) : ouvre l'inscription avec le jeton, puis nettoie l'URL.
+    try {
+      const token = new URLSearchParams(window.location.search).get('invite');
+      if (token) {
+        this.authModal.inviteToken.set(token);
+        this.authModal.open('signup');
+        const url = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', url);
+      }
+    } catch { /* pas de window / URL invalide : on ignore */ }
   }
 
   openAuth(mode: 'login' | 'signup') {

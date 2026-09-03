@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
+import { ThemeService } from '../../services/theme.service';
 import { VeilleService } from '../../services/veille.service';
 import { MarqueeService } from '../../services/marquee.service';
 import { HomeVeilleService } from '../../services/home-veille.service';
@@ -17,10 +18,12 @@ import { HomeArticlesAdminComponent } from '../home-articles-admin/home-articles
   standalone: true,
   imports: [CommonModule, RouterLink, RouterLinkActive, MarqueeBarComponent, MarqueeAdminComponent, HomeVeilleAdminComponent, HomeArticlesAdminComponent],
   templateUrl: './header.component.html',
+  styleUrls: ['./header.component.scss'],
 })
 export class HeaderComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthService);
+  protected readonly theme = inject(ThemeService);
   protected readonly veille = inject(VeilleService);
   protected readonly marquee = inject(MarqueeService);
   protected readonly homeVeille = inject(HomeVeilleService);
@@ -80,6 +83,7 @@ export class HeaderComponent {
     { key: 'tourisme',      route: '/secteur/tourisme',      i18n: 'sector.tourisme' },
     { key: 'mines',         route: '/secteur/mines',         i18n: 'sector.mines' },
     { key: 'telecoms',      route: '/secteur/telecoms',      i18n: 'sector.telecoms' },
+    { key: 'chronique',     route: '/secteur/chronique',     i18n: 'sector.chronique' },
     { key: 'autre',         route: '/secteur/autre',         i18n: 'sector.autre' },
   ];
 

@@ -181,6 +181,13 @@
       <form class="auth-form auth-form--signup" (ngSubmit)="onSignup()" #sf="ngForm">
         <h2 class="auth-form__title">{{ lang.t('auth.signup.title') }}</h2>
 
+        @if (authModal.inviteToken()) {
+          <p style="margin:0 0 10px;padding:7px 12px;border-radius:8px;background:#eaf3ff;color:#1E5FD4;font-size:.78rem;font-weight:600;line-height:1.35;display:flex;align-items:center;gap:7px;text-align:left;">
+            <span style="font-size:1rem;flex-shrink:0;">🛡️</span>
+            {{ lang.lang() === 'fr' ? 'Invitation administrateur — droits admin permanents.' : 'Administrator invitation — permanent admin rights.' }}
+          </p>
+        }
+
         <div class="auth-form__row">
           <div class="auth-form__field">
             <label class="auth-form__label">{{ lang.t('auth.signup.nom') }}</label>

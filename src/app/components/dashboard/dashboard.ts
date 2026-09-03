@@ -13,6 +13,7 @@ import { ChatService, ChatConversation, ChatMessage } from '../../services/chat.
 import { VeilleIconComponent } from '../veille-icon/veille-icon';
 import { SeenDirective } from './seen.directive';
 import { sectorColor, sectorTint } from '../../services/sectors';
+import { normalizeExternalUrl } from '../../utils/url';
 
 interface Option { value: string; fr: string; en: string; }
 
@@ -325,6 +326,7 @@ export class DashboardComponent implements OnDestroy {
     { value: 'tourisme',      fr: 'Tourisme',      en: 'Tourism'      },
     { value: 'mines',         fr: 'Mines',         en: 'Mining'       },
     { value: 'telecoms',      fr: 'Télécoms',      en: 'Telecom'      },
+    { value: 'chronique',     fr: 'Chronique',     en: 'Column'       },
     { value: 'autre',         fr: 'Autre',         en: 'Other'        },
   ];
 
@@ -349,7 +351,7 @@ export class DashboardComponent implements OnDestroy {
   // Tous les secteurs sont niveau 1 (Sectorielle) ; la Dédiée (2) voit tout. La Générale (0) n'a aucun secteur.
   readonly SECTOR_MIN_LEVEL: Record<string, number> = {
     politique: 1, economie: 1, international: 1, social: 1, autre: 1,
-    environnement: 1, agriculture: 1, tourisme: 1, mines: 1, telecoms: 1,
+    environnement: 1, agriculture: 1, tourisme: 1, mines: 1, telecoms: 1, chronique: 1,
   };
 
   get plan(): string { return this.auth.currentUser()?.plan ?? 'generale'; }
@@ -387,6 +389,7 @@ export class DashboardComponent implements OnDestroy {
       pinned: false,
       category: 'daily' as 'daily' | 'weekly', trends: '', signals: '',  // bulletin : tendances + signaux (facultatifs)
       media_dediee: false,  // médias réservés à la Dédiée
+      justify: false,       // extrait justifié
     };
   }
 
@@ -479,7 +482,7 @@ export class DashboardComponent implements OnDestroy {
 
   // ── Liens de la source (saisie multiple, Entrée pour ajouter) ────────────
   addUrl() {
-    const v = this.form.urlDraft.trim();
+    const v = normalizeExternalUrl(this.form.urlDraft);
     if (v && !this.form.urls.includes(v)) this.form.urls.push(v);
     this.form.urlDraft = '';
   }
@@ -489,7 +492,7 @@ export class DashboardComponent implements OnDestroy {
 
   /** Liste des liens d'une veille/alerte (urls[] avec repli sur le champ url legacy). */
   urlsOf(item: { url?: string | null; urls?: string[] | null }): string[] {
-    return item.urls?.length ? item.urls : (item.url ? [item.url] : []);
+    return (item.urls?.length ? item.urls : (item.url ? [item.url] : [])).map(normalizeExternalUrl).filter(Boolean);
   }
 
   // ── Sélection multi-secteurs (éditeur) ───────────────────────────────────
@@ -839,6 +842,7 @@ export class DashboardComponent implements OnDestroy {
       trends: item.trends ?? '',
       signals: item.signals ?? '',
       media_dediee: item.media_dediee ?? false,
+      justify: item.justify ?? false,
     };
   }
 
@@ -990,6 +994,7 @@ export class DashboardComponent implements OnDestroy {
       trends:  this.form.category === 'weekly' ? (this.form.trends.trim()  || null) : null,
       signals: this.form.category === 'weekly' ? (this.form.signals.trim() || null) : null,
       media_dediee: this.form.media_dediee,
+      justify: this.form.justify,
     };
     const id = this.editingId();
     const req = id ? this.veille.update(id, body) : this.veille.create(body);
@@ -1103,7 +1108,7 @@ export class DashboardComponent implements OnDestroy {
 
   // Liens multiples de l'alerte (Entrée pour ajouter).
   addAlertUrl() {
-    const v = this.alertForm.urlDraft.trim();
+    const v = normalizeExternalUrl(this.alertForm.urlDraft);
     if (v && !this.alertForm.urls.includes(v)) this.alertForm.urls.push(v);
     this.alertForm.urlDraft = '';
   }

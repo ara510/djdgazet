@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Zones privées / back-office : inutiles pour l'index
+Disallow: /admin
+Disallow: /profil
+Disallow: /favoris
+Disallow: /gestion-articles
+
+Sitemap: https://mg-headlines.com/sitemap.xml

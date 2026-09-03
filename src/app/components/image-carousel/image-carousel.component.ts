@@ -17,7 +17,7 @@ import { CommonModule } from '@angular/common';
              class="absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out"
              [class.object-cover]="fit() === 'cover'" [class.object-contain]="fit() === 'contain'"
              [class.opacity-100]="i === index()" [class.opacity-0]="i !== index()"
-             [attr.aria-hidden]="i !== index()" loading="lazy" />
+             [attr.aria-hidden]="i !== index()" loading="lazy" decoding="async" />
       }
       @if (images().length > 1) {
         <!-- Flèches (apparaissent au survol ; sur mobile, utiliser les pastilles) -->

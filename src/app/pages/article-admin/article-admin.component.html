@@ -11,7 +11,9 @@
         <h1 class="font-display font-black text-3xl text-gazety-dark">{{ fr() ? 'Gestion des articles' : 'Manage articles' }}</h1>
       </div>
       @if (!formOpen()) {
-        <button (click)="newArticle()" class="btn-primary text-sm whitespace-nowrap">+ {{ fr() ? 'Nouvel article' : 'New article' }}</button>
+        <a routerLink="/gestion-articles/nouveau" class="btn-primary text-sm whitespace-nowrap">+ {{ fr() ? 'Nouvel article' : 'New article' }}</a>
+      } @else {
+        <a routerLink="/gestion-articles" class="btn-ghost text-sm whitespace-nowrap">← {{ fr() ? 'Retour à la liste' : 'Back to list' }}</a>
       }
     </div>
 
@@ -155,7 +157,8 @@
       </form>
     }
 
-    <!-- Liste des articles -->
+    <!-- Liste des articles (page distincte du formulaire) -->
+    @if (!formOpen()) {
     @if (loading()) {
       <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
     } @else if (articles().length === 0) {
@@ -179,12 +182,13 @@
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <a [routerLink]="['/article', a.id]" class="btn-ghost text-xs">{{ fr() ? 'Voir' : 'View' }}</a>
-              <button (click)="edit(a)" class="btn-ghost text-xs">{{ fr() ? 'Modifier' : 'Edit' }}</button>
+              <a [routerLink]="['/gestion-articles', a.id, 'modifier']" class="btn-ghost text-xs">{{ fr() ? 'Modifier' : 'Edit' }}</a>
               <button (click)="remove(a)" class="btn-ghost text-xs text-gazety-red">{{ fr() ? 'Suppr.' : 'Delete' }}</button>
             </div>
           </div>
         }
       </div>
+    }
     }
   </section>
 }

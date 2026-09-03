@@ -37,19 +37,39 @@
       <div class="flex flex-col gap-5">
         @for (v of items(); track v.id) {
           <article class="bg-white border border-silver-200 rounded-xl overflow-hidden shadow-sm">
-            <!-- Photos affichées EN ENTIER (pas de recadrage) ; clic = plein écran (coupures de journal) -->
-            @if (imagesOf(v).length === 1) {
-              <button type="button" (click)="openLightbox(imagesOf(v), 0)" [attr.aria-label]="fr() ? 'Agrandir la photo' : 'Enlarge photo'"
-                      class="group/ph relative block w-full cursor-zoom-in">
-                <img [src]="imagesOf(v)[0]" [alt]="heading(v)" loading="lazy"
-                     class="block w-full h-auto max-h-[85vh] object-contain bg-silver-100" />
-                <span class="absolute top-2 right-2 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 group-hover/ph:opacity-100 transition-opacity" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                </span>
-              </button>
-            } @else if (imagesOf(v).length > 1) {
-              <div class="relative bg-silver-100 overflow-hidden h-80 sm:h-96 cursor-zoom-in" (click)="openLightbox(imagesOf(v), 0)">
-                <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)" fit="contain" />
+            <!-- Photos EN ENTIER ; coupures presse floutées pour les visiteurs (nettes une fois connecté) -->
+            @if (imagesOf(v).length) {
+              <div class="relative overflow-hidden">
+                @if (imagesOf(v).length === 1) {
+                  <button type="button" (click)="onImageClick(v)"
+                          [attr.aria-label]="blurPresse(v) ? (fr() ? 'Créer un compte pour voir la coupure' : 'Create an account to view') : (fr() ? 'Agrandir la photo' : 'Enlarge photo')"
+                          class="group/ph relative block w-full" [class.cursor-zoom-in]="!blurPresse(v)" [class.cursor-pointer]="blurPresse(v)">
+                    <img [src]="imagesOf(v)[0]" [alt]="heading(v)" loading="lazy"
+                         class="block w-full h-auto max-h-[85vh] object-contain bg-silver-100 transition-[filter]"
+                         [style.filter]="blurPresse(v) ? 'blur(14px)' : null" [style.transform]="blurPresse(v) ? 'scale(1.06)' : null" />
+                    @if (!blurPresse(v)) {
+                      <span class="absolute top-2 right-2 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/45 text-white opacity-0 group-hover/ph:opacity-100 transition-opacity" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                      </span>
+                    }
+                  </button>
+                } @else {
+                  <div class="relative bg-silver-100 overflow-hidden h-80 sm:h-96" [class.cursor-zoom-in]="!blurPresse(v)" [class.cursor-pointer]="blurPresse(v)" (click)="onImageClick(v)"
+                       [style.filter]="blurPresse(v) ? 'blur(14px)' : null" [style.transform]="blurPresse(v) ? 'scale(1.06)' : null">
+                    <app-image-carousel class="absolute inset-0" [images]="imagesOf(v)" [alt]="heading(v)" fit="contain" />
+                  </div>
+                }
+
+                <!-- Voile « abonnés » sur une coupure presse floutée (net et cliquable au-dessus du flou) -->
+                @if (blurPresse(v)) {
+                  <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4 pointer-events-none">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gazety-dark/85 text-white text-xs font-bold">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      {{ fr() ? 'Réservé aux abonnés' : 'Members only' }}
+                    </span>
+                    <span class="text-[11px] font-semibold text-white bg-black/45 px-2 py-0.5 rounded">{{ fr() ? 'Créez un compte pour voir la coupure' : 'Create an account to view the clipping' }}</span>
+                  </div>
+                }
               </div>
             }
 
@@ -94,7 +114,7 @@
 
               <!-- Texte intégral (formatage léger **gras** *italique* ==surlignage==) -->
               @if (v.excerpt) {
-                <div class="text-[15px] text-silver-700 leading-relaxed whitespace-pre-line" [innerHTML]="richText(v.excerpt)"></div>
+                <div class="text-[15px] text-silver-700 leading-relaxed whitespace-pre-line" [class.text-justify]="v.justify" [innerHTML]="richText(v.excerpt)"></div>
               }
 
               <!-- Vidéo éventuelle -->

@@ -44,6 +44,20 @@ export const routes: Routes = [
     title: 'Gestion des articles — Headlines',
   },
   {
+    path: 'gestion-articles/nouveau',
+    loadComponent: () =>
+      import('./pages/article-admin/article-admin.component').then((m) => m.ArticleAdminComponent),
+    data: { mode: 'new' },
+    title: 'Nouvel article — Headlines',
+  },
+  {
+    path: 'gestion-articles/:id/modifier',
+    loadComponent: () =>
+      import('./pages/article-admin/article-admin.component').then((m) => m.ArticleAdminComponent),
+    data: { mode: 'edit' },
+    title: 'Modifier un article — Headlines',
+  },
+  {
     path: 'admin',
     loadComponent: () =>
       import('./pages/admin/admin.component').then((m) => m.AdminComponent),
