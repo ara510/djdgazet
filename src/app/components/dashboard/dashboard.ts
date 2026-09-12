@@ -14,13 +14,14 @@ import { VeilleIconComponent } from '../veille-icon/veille-icon';
 import { SeenDirective } from './seen.directive';
 import { sectorColor, sectorTint } from '../../services/sectors';
 import { normalizeExternalUrl } from '../../utils/url';
+import { LoaderComponent } from '../loader/loader.component';
 
 interface Option { value: string; fr: string; en: string; }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, VeilleIconComponent, SeenDirective],
+  imports: [CommonModule, FormsModule, VeilleIconComponent, SeenDirective, LoaderComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -548,8 +549,12 @@ export class DashboardComponent implements OnDestroy {
       type: this.activeType(), sector: this.activeSector(), q: this.search.trim(),
       from: this.dateFrom(), to: this.dateTo(),
       category: this.veilleCategory(),
+      reading: this.readingFilter(),
     };
   }
+
+  /** Page suivante du fil (bouton « Charger plus »). */
+  loadMoreVeille() { this.veille.loadMore(); }
 
   selectType(value: string | null) {
     this.activeType.set(value);
@@ -578,16 +583,16 @@ export class DashboardComponent implements OnDestroy {
   }
 
   // ── Lecture : favoris / lu-non lu ───────────────────────────────────────
-  get displayedVeille(): VeilleItem[] {
-    const items = this.veille.items();
-    if (this.readingFilter() === 'favorites') return items.filter(i => i.favorite);
-    if (this.readingFilter() === 'unread')    return items.filter(i => !i.read);
-    return items;
-  }
-  get unreadCount(): number { return this.veille.items().filter(i => !i.read).length; }
-  get favoritesCount(): number { return this.veille.items().filter(i => i.favorite).length; }
+  // Le tri est fait par le serveur (le fil est paginé : filtrer ici ne chercherait que dans
+  // la page chargée). Les compteurs viennent aussi du serveur, sur l'ensemble du fil.
+  get displayedVeille(): VeilleItem[] { return this.veille.items(); }
+  get unreadCount(): number { return this.veille.unreadTotal(); }
+  get favoritesCount(): number { return this.veille.favoritesTotal(); }
 
-  setReadingFilter(f: 'all' | 'unread' | 'favorites') { this.readingFilter.set(f); }
+  setReadingFilter(f: 'all' | 'unread' | 'favorites') {
+    this.readingFilter.set(f);
+    this.veille.load(this.currentFilters());
+  }
 
   // ── Mode d'affichage selon l'abonnement ────────────────────────────────────
   //  grid  : Veille Générale (gratuite) — grille de cartes compactes (clic = détail)
@@ -659,17 +664,14 @@ export class DashboardComponent implements OnDestroy {
     this.selectedItem.set(item);
     this.galleryIndex.set(0);
     if (!this.isAdmin && !item.read) this.veille.setState(item.id, { read: true }).subscribe({ error: () => {} });
-    // La liste ne renvoie que l'image principale + has_video : on charge le détail complet
-    // (toutes les images + vidéo) à la demande.
-    if (item.has_video || (item.images_count ?? 0) > 1) {
-      this.veille.getOne(item.id).subscribe({
-        next: full => {
-          if (this.selectedItem()?.id === item.id)
-            this.selectedItem.update(s => s ? { ...s, video: full.video, images: full.images } : s);
-        },
-        error: () => {},
-      });
-    }
+    // La liste est allégée (extrait tronqué, pas de galerie ni trends/signals) : on charge
+    // systématiquement le détail complet à l'ouverture.
+    this.veille.getOne(item.id).subscribe({
+      next: full => {
+        if (this.selectedItem()?.id === item.id) this.selectedItem.set({ ...item, ...full });
+      },
+      error: () => {},
+    });
   }
   closeDetail() { this.selectedItem.set(null); }
 

@@ -8,17 +8,19 @@ import { VeilleService, VeilleItem } from '../../services/veille.service';
 import { HomeVeilleService, HomeScale } from '../../services/home-veille.service';
 import { HomeArticlesService } from '../../services/home-articles.service';
 import { ArticleService, ArticleItem } from '../../services/article.service';
+import { MarqueeService } from '../../services/marquee.service';
 import { MarqueeBarComponent } from '../../components/marquee-bar/marquee-bar.component';
 import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
 import { ImageCarouselComponent } from '../../components/image-carousel/image-carousel.component';
 import { sectorColor, sectorTint } from '../../services/sectors';
 import { formatRecapText } from '../../services/rich-text';
 import { normalizeExternalUrl } from '../../utils/url';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, MarqueeBarComponent, VeilleIconComponent, ImageCarouselComponent],
+  imports: [CommonModule, RouterLink, MarqueeBarComponent, VeilleIconComponent, ImageCarouselComponent, LoaderComponent],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
@@ -29,6 +31,7 @@ export class HomeComponent {
   private readonly homeVeille = inject(HomeVeilleService);
   private readonly homeArticles = inject(HomeArticlesService);
   private readonly articlesSvc = inject(ArticleService);
+  private readonly marquee = inject(MarqueeService);
   private readonly router = inject(Router);
 
   readonly fr = computed(() => this.i18n.isFrench());
@@ -42,6 +45,8 @@ export class HomeComponent {
   /** Mise en page « une de journal » : titres secondaires en tête, puis grille en dessous. */
   readonly leadSecondary = computed(() => this.rest().slice(0, 3));
   readonly gridArticles  = computed(() => this.rest().slice(3));
+  /** Aperçu « Derniers articles » : au-delà, on renvoie vers la page dédiée `/articles`. */
+  readonly gridPreview   = computed(() => this.gridArticles().slice(0, 5));
   /** Date longue façon journal (« mardi 3 septembre 2026 »). */
   todayLong(): string {
     return new Date().toLocaleDateString(this.fr() ? 'fr-FR' : 'en-GB',
@@ -84,6 +89,31 @@ export class HomeComponent {
 
   /** Bande « À la une » (A1) : quelques derniers titres qui défilent sous l'en-tête. */
   readonly breaking = computed(() => this.latest().slice(0, 7));
+
+  /** Vitesse de défilement de la bande (A1), réglable par l'utilisateur via un slider.
+   *  1 = lent … 10 = rapide. Persistée en localStorage (clé hl-marquee-speed). */
+  /** Vitesse GLOBALE de la bande « En continu » (réglage admin persisté serveur). */
+  readonly marqueeSpeed = computed(() => this.marquee.breakingSpeed());
+  /** Durée d'un cycle d'animation en secondes (inverse de la vitesse) : 1→60s, 10→6s. */
+  readonly marqueeDuration = computed(() => 66 - this.marqueeSpeed() * 6);
+  /** Réservé aux admins : réglage caché derrière une icône d'options. */
+  readonly isAdmin = computed(() => !!this.auth.currentUser()?.is_admin);
+  readonly showMarqueeOpts = signal(false);
+  toggleMarqueeOpts(): void { this.showMarqueeOpts.update(v => !v); }
+
+  private clampSpeed(ev: Event): number {
+    return Math.min(10, Math.max(1, parseInt((ev.target as HTMLInputElement).value, 10) || 5));
+  }
+
+  /** Aperçu en direct pendant le glissement (signal du service, sans requête). */
+  onMarqueeSpeedInput(ev: Event): void {
+    this.marquee.breakingSpeed.set(this.clampSpeed(ev));
+  }
+
+  /** Au relâchement : persistance GLOBALE côté serveur (tous les visiteurs). */
+  onMarqueeSpeedCommit(ev: Event): void {
+    this.marquee.setSpeed('breaking', this.clampSpeed(ev)).subscribe({ error: () => {} });
+  }
 
   /** Fil illustré regroupé par jour (A7) : Aujourd'hui / Hier / date. */
   readonly latestWithPhotoByDay = computed(() => {

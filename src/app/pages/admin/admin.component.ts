@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminService, FeedbackItem, AdminUser } from '../../services/admin.service';
 import { ChatService, ChatConversation, ChatMessage } from '../../services/chat.service';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 type AdminTab = 'stats' | 'users' | 'feedback' | 'messages' | 'activity';
 interface Option { value: string; fr: string; en: string; }
@@ -14,7 +15,7 @@ interface Option { value: string; fr: string; en: string; }
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, LoaderComponent],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
 })
@@ -216,6 +217,30 @@ export class AdminComponent implements OnDestroy {
     if (!body || !body.trim()) return;
     this.admin.messageUser(user.id, body.trim()).subscribe({
       next: () => this.toast.show(this.fr ? 'Message envoyé.' : 'Message sent.', 'success'),
+      error: (err) => this.toast.show(err.error?.error || 'Erreur.', 'error'),
+    });
+  }
+
+  /** Seul le super-administrateur (ara510 / nathan@dujardin-delacour.com) peut envoyer un lien de reset. */
+  get isSuperAdmin(): boolean {
+    const u = this.auth.currentUser();
+    return !!u && u.is_admin === true
+      && u.username === 'ara510'
+      && (u.email || '').toLowerCase() === 'nathan@dujardin-delacour.com';
+  }
+
+  /** SUPER-ADMIN : envoie à l'utilisateur un lien de réinitialisation de mot de passe (par email). */
+  async sendResetLink(user: AdminUser) {
+    const ok = await this.toast.confirm({
+      title: this.fr ? `Réinitialiser le mot de passe de @${user.username} ?` : `Reset @${user.username}'s password?`,
+      text: this.fr
+        ? "Un lien sécurisé sera envoyé à son adresse email (valable 15 min). Le mot de passe n'est jamais affiché."
+        : 'A secure link will be emailed to them (valid 15 min). The password is never shown.',
+      confirmText: this.fr ? 'Envoyer le lien' : 'Send link',
+    });
+    if (!ok) return;
+    this.admin.sendResetLink(user.id).subscribe({
+      next: (r) => this.toast.show(this.fr ? `Lien envoyé à ${r.email}.` : `Link sent to ${r.email}.`, 'success'),
       error: (err) => this.toast.show(err.error?.error || 'Erreur.', 'error'),
     });
   }

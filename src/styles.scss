@@ -208,6 +208,21 @@ html.dark {
     h1, h2, h3, h4 { color: #e7ebf2; }
     blockquote { background: #1a2130; color: #aeb7c5; border-left-color: #1e5fd4; }
     hr { border-top-color: #2a3242; }
+
+    /* Le texte saisi via l'éditeur riche porte souvent une couleur EN LIGNE (picker couleur du
+       texte) — ex. le noir par défaut #1d1d1f — invisible sur fond sombre. `!important` bat
+       tout style inline non-important (la règle CSS l'emporte sur l'inline dès qu'elle est
+       importante, indépendamment de la spécificité) : on force donc une couleur lisible sur
+       tout le corps de texte, SANS toucher aux liens (accent rouge, distinctif) ni au
+       surlignage (`mark`, déjà géré ci-dessous avec un texte foncé exprès). */
+    p, span, li, strong, b, em, i, u, s, strike, sub, sup, div {
+      color: #dfe4ec !important;
+    }
+    /* Fond de surlignage choisi en ligne (picker surlignage) : neutralisé en un ton sombre
+       cohérent plutôt que de garder une couleur pastel pensée pour un fond blanc. */
+    [style*="background-color"] {
+      background-color: rgba(255, 255, 255, 0.12) !important;
+    }
   }
 
   /* Tuiles qui DOIVENT rester blanches même en sombre (fond derrière un logo foncé). */
@@ -216,6 +231,16 @@ html.dark {
   /* Surlignage jaune : garder un texte foncé pour rester lisible en sombre. */
   mark { color: #1c2637; }
 }
+
+/* ── Slider de vitesse de la bande « À la une » (A1) ──────────────────────────── */
+.marquee-speed {
+  accent-color: #1e5fd4;
+  height: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+/* Variante sur bande sombre (marquee « À la une ») : accent plus clair. */
+.marquee-speed--dark { accent-color: #4b83ea; }
 
 /* ── Micro-interaction « feedback au clic » (B5) : léger enfoncement au tap ─────
    Appliqué aux cartes/boutons cliquables du site. Désactivé si l'utilisateur

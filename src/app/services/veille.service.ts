@@ -50,6 +50,19 @@ export interface VeilleFilters {
   from?: string;
   to?: string;
   category?: string | null;   // daily (récap) / weekly (bulletin)
+  reading?: 'all' | 'unread' | 'favorites';
+}
+
+/** Réponse paginée de GET /api/veille. `unread`/`favorites` comptent TOUT le fil filtré
+ *  (hors filtre de lecture) pour que les badges restent justes malgré la pagination. */
+export interface VeillePage {
+  items: VeilleItem[];
+  total: number;
+  unread: number;
+  favorites: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -60,6 +73,12 @@ export class VeilleService {
   readonly isOpen  = signal(false);
   readonly items   = signal<VeilleItem[]>([]);
   readonly loading = signal(false);
+  // Pagination du fil : totaux serveur (badges justes) + état « charger plus ».
+  readonly total          = signal(0);
+  readonly unreadTotal    = signal(0);
+  readonly favoritesTotal = signal(0);
+  readonly hasMore        = signal(false);
+  readonly loadingMore    = signal(false);
 
   readonly trash        = signal<VeilleItem[]>([]);
   readonly trashLoading = signal(false);
@@ -93,8 +112,10 @@ export class VeilleService {
     return this.http.delete(`/api/veille/${id}/permanent`, { headers: this.headers() });
   }
 
-  load(filters: VeilleFilters = {}) {
-    this.loading.set(true);
+  /** Filtres de la dernière requête — rejoués tels quels pour charger la page suivante. */
+  private lastFilters: VeilleFilters = {};
+
+  private buildParams(filters: VeilleFilters, offset: number): HttpParams {
     let params = new HttpParams();
     if (filters.type)     params = params.set('type', filters.type);
     if (filters.sector)   params = params.set('sector', filters.sector);
@@ -102,9 +123,43 @@ export class VeilleService {
     if (filters.from)     params = params.set('from', filters.from);
     if (filters.to)       params = params.set('to', filters.to);
     if (filters.category) params = params.set('category', filters.category);
-    this.http.get<VeilleItem[]>('/api/veille', { headers: this.headers(), params }).subscribe({
-      next: rows => { this.items.set(rows); this.loading.set(false); },
-      error: ()   => { this.loading.set(false); },
+    if (filters.reading && filters.reading !== 'all') params = params.set('reading', filters.reading);
+    return params.set('offset', String(offset));
+  }
+
+  /** Charge (ou recharge) la 1re page du fil. Les filtres — y compris « non lus » / « favoris » —
+   *  sont appliqués côté serveur, donc ils portent sur tout le fil et pas sur la page chargée. */
+  load(filters: VeilleFilters = {}) {
+    this.lastFilters = filters;
+    this.loading.set(true);
+    this.http.get<VeillePage>('/api/veille', { headers: this.headers(), params: this.buildParams(filters, 0) }).subscribe({
+      next: p => {
+        this.items.set(p.items);
+        this.total.set(p.total);
+        this.unreadTotal.set(p.unread);
+        this.favoritesTotal.set(p.favorites);
+        this.hasMore.set(p.hasMore);
+        this.loading.set(false);
+      },
+      error: () => { this.loading.set(false); },
+    });
+  }
+
+  /** Page suivante : ajoute au fil déjà affiché. */
+  loadMore() {
+    if (this.loadingMore() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    const offset = this.items().length;
+    this.http.get<VeillePage>('/api/veille', { headers: this.headers(), params: this.buildParams(this.lastFilters, offset) }).subscribe({
+      next: p => {
+        this.items.update(list => [...list, ...p.items]);
+        this.total.set(p.total);
+        this.unreadTotal.set(p.unread);
+        this.favoritesTotal.set(p.favorites);
+        this.hasMore.set(p.hasMore);
+        this.loadingMore.set(false);
+      },
+      error: () => { this.loadingMore.set(false); },
     });
   }
 
@@ -127,6 +182,15 @@ export class VeilleService {
 
   /** Met à jour l'état (favori/lu) localement + côté serveur. */
   setState(id: number, patch: { favorite?: boolean; read?: boolean }) {
+    // Les compteurs viennent du serveur (ils portent sur tout le fil, pas sur la page chargée) :
+    // on les ajuste ici pour que les badges réagissent immédiatement au clic.
+    const before = this.items().find(i => i.id === id);
+    if (before) {
+      if (patch.read !== undefined && !!before.read !== patch.read)
+        this.unreadTotal.update(n => Math.max(0, n + (patch.read ? -1 : 1)));
+      if (patch.favorite !== undefined && !!before.favorite !== patch.favorite)
+        this.favoritesTotal.update(n => Math.max(0, n + (patch.favorite ? 1 : -1)));
+    }
     this.items.update(list => list.map(i => i.id === id ? { ...i, ...patch } : i));
     return this.http.post(`/api/veille/${id}/state`, patch, { headers: this.headers() });
   }

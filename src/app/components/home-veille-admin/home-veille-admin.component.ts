@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HomeVeilleService, HomeVeilleCandidate, HomeScale } from '../../services/home-veille.service';
 import { I18nService } from '../../services/i18n.service';
 import { ToastService } from '../../services/toast.service';
+import { LoaderComponent } from '../loader/loader.component';
 
 /**
  * Modale admin : pilote la section « Veille média » de l'accueil.
@@ -14,7 +15,7 @@ import { ToastService } from '../../services/toast.service';
 @Component({
   selector: 'app-home-veille-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoaderComponent],
   template: `
     <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50" (click)="close()"></div>
@@ -125,7 +126,7 @@ import { ToastService } from '../../services/toast.service';
               }
             </div>
             @if (loading()) {
-              <p class="text-sm text-silver-500">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+              <app-loader />
             } @else if (candidates().length === 0) {
               <p class="text-sm text-silver-500">{{ fr ? 'Aucune veille publiée pour le moment.' : 'No published item yet.' }}</p>
             } @else {

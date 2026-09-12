@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { VeilleItem } from '../../services/veille.service';
 import { VeilleIconComponent } from '../veille-icon/veille-icon';
 import { normalizeExternalUrl } from '../../utils/url';
+import { LoaderComponent } from '../loader/loader.component';
 
 interface Opt { value: string; fr: string; en: string; }
 
@@ -19,7 +20,7 @@ interface PublicVeille extends VeilleItem {
 @Component({
   selector: 'app-veille-public',
   standalone: true,
-  imports: [CommonModule, VeilleIconComponent],
+  imports: [CommonModule, VeilleIconComponent, LoaderComponent],
   templateUrl: './veille-public.html',
   styleUrl: './veille-public.scss',
 })

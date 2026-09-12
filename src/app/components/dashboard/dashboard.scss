@@ -774,6 +774,39 @@
   }
 }
 
+/* ── Pagination du fil veille (« Charger plus ») ─────────────────────────────── */
+.dash__more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 0 1rem;
+}
+
+.dash__more-btn {
+  padding: 0.7rem 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+
+  &:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
+  &:disabled { opacity: 0.6; cursor: default; }
+}
+
+.dash__more-count {
+  font-size: 0.72rem;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.05em;
+
+  &--end { display: block; text-align: center; padding: 1.5rem 0 0.5rem; }
+}
+
 .dash-field {
   display: flex;
   flex-direction: column;
@@ -804,6 +837,23 @@
     &:focus { border-color: var(--color-accent); }
     &::placeholder { color: var(--color-ink-muted); opacity: 0.5; }
     &[type="date"] { color-scheme: light; }
+  }
+
+  /* `<select>` (types de source, secteurs…) : contrairement à `<input>`, un `background:
+     transparent` ne suffit pas — beaucoup de navigateurs gardent un fond de contrôle natif
+     (clair) par-dessus tant que `appearance` n'est pas neutralisé. D'où un encart clair
+     incongru en mode sombre malgré la couleur de texte correcte. On reprend la main
+     entièrement : fond + chevron custom, thème-aware. */
+  select#{&}__input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: var(--color-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6472' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 14px;
+    padding-right: 2.2rem;
+    cursor: pointer;
   }
 
   &__textarea { resize: vertical; line-height: 1.6; min-height: 150px; }

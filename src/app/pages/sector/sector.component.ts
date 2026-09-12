@@ -9,6 +9,7 @@ import { VeilleService } from '../../services/veille.service';
 import { ArticleService, ArticleItem } from '../../services/article.service';
 import { VeilleIconComponent } from '../../components/veille-icon/veille-icon';
 import { formatRecapText } from '../../services/rich-text';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 interface SectorVeille {
   id: number;
@@ -61,7 +62,7 @@ interface SectorResponse {
 @Component({
   selector: 'app-sector',
   standalone: true,
-  imports: [CommonModule, RouterLink, VeilleIconComponent],
+  imports: [CommonModule, RouterLink, VeilleIconComponent, LoaderComponent],
   templateUrl: './sector.component.html',
   styleUrl: './sector.component.scss',
 })
@@ -102,6 +103,8 @@ export class SectorComponent {
   readonly hasAny = computed(() => this.groups().some(g => g.items.length > 0));
   readonly hasLocked = computed(() => this.groups().some(g => g.items.some(v => v.locked)));
   readonly articles = signal<ArticleItem[]>([]);
+  /** Aperçu sur la page rubrique : au-delà, on renvoie vers la page dédiée `/articles/:sector`. */
+  readonly articlesPreview = computed(() => this.articles().slice(0, 5));
 
   constructor() {
     this.route.paramMap.subscribe(p => {

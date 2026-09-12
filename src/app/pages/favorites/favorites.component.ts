@@ -6,11 +6,12 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { VeilleService } from '../../services/veille.service';
 import { ArticleService, ArticleItem, FavoriteVeille } from '../../services/article.service';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 @Component({
   selector: 'app-favorites',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, LoaderComponent],
   templateUrl: './favorites.component.html',
 })
 export class FavoritesComponent {

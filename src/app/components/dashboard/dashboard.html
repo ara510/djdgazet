@@ -161,7 +161,7 @@
       @if (view() === 'stats') {
         <!-- ── Vue Statistiques (admin) ── -->
         @if (admin.statsLoading() || !admin.stats()) {
-          <p class="dash__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+          <app-loader />
         } @else {
           @let s = admin.stats()!;
           <div class="stats-tiles">
@@ -229,7 +229,7 @@
       } @else if (view() === 'trash') {
         <!-- ── Vue Corbeille (admin) ── -->
         @if (veille.trashLoading()) {
-          <p class="dash__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+          <app-loader />
         } @else if (veille.trash().length === 0) {
           <div class="dash__empty">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -268,7 +268,7 @@
       } @else if (view() === 'option' && optionKind() === 'realtime') {
         <!-- ── Veille › Temps réel : alertes ciblées par abonnement ── -->
         @if (alerts.loading()) {
-          <p class="dash__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+          <app-loader />
         } @else {
           @if (isAdmin) {
             <p class="alert-intro">
@@ -353,7 +353,7 @@
           }
         }
       } @else if (veille.loading()) {
-        <p class="dash__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+        <app-loader />
       } @else if (displayedVeille.length === 0) {
         <div class="dash__empty">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink-muted)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
@@ -669,6 +669,22 @@
               }
             </div>
           }
+        }
+
+        <!-- Pagination du fil : le reste est chargé à la demande. -->
+        @if (veille.hasMore()) {
+          <div class="dash__more">
+            <button type="button" class="dash__more-btn" (click)="loadMoreVeille()" [disabled]="veille.loadingMore()">
+              {{ veille.loadingMore()
+                ? (fr ? 'Chargement…' : 'Loading…')
+                : (fr ? 'Charger plus' : 'Load more') }}
+            </button>
+            <span class="dash__more-count">{{ displayedVeille.length }} / {{ veille.total() }}</span>
+          </div>
+        } @else if (displayedVeille.length > 0) {
+          <p class="dash__more-count dash__more-count--end">
+            {{ fr ? '— Fin du fil —' : '— End of feed —' }}
+          </p>
         }
       }
     </main>

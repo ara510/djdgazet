@@ -12,6 +12,7 @@ import { ImageCarouselComponent } from '../../components/image-carousel/image-ca
 import { sectorColor, sectorTint } from '../../services/sectors';
 import { formatRecapText } from '../../services/rich-text';
 import { normalizeExternalUrl } from '../../utils/url';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 /**
  * Fil plein écran d'une catégorie gratuite (Actualité / Fait marquant), façon Facebook :
@@ -21,7 +22,7 @@ import { normalizeExternalUrl } from '../../utils/url';
 @Component({
   selector: 'app-feed',
   standalone: true,
-  imports: [CommonModule, FormsModule, VeilleIconComponent, ImageCarouselComponent],
+  imports: [CommonModule, FormsModule, VeilleIconComponent, ImageCarouselComponent, LoaderComponent],
   templateUrl: './feed.component.html',
 })
 export class FeedComponent implements AfterViewInit, OnDestroy {

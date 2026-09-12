@@ -118,7 +118,7 @@ export const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'auth.forgot.title':    'Mot de passe oublié',
     'auth.forgot.desc':     'Entrez votre email pour recevoir un lien de réinitialisation.',
     'auth.forgot.email':    'Adresse email',
-    'auth.forgot.submit':   'Envoyer le lien — Bientôt disponible',
+    'auth.forgot.submit':   'Envoyer le lien',
     'auth.forgot.back':     'Retour',
 
     // Abonnement / Veille
@@ -264,7 +264,7 @@ export const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'auth.forgot.title':    'Forgot password',
     'auth.forgot.desc':     'Enter your email to receive a reset link.',
     'auth.forgot.email':    'Email address',
-    'auth.forgot.submit':   'Send link — Coming soon',
+    'auth.forgot.submit':   'Send link',
     'auth.forgot.back':     'Back',
 
     // Subscription / Watch

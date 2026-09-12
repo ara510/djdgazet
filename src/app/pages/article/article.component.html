@@ -13,7 +13,7 @@
         <span class="font-semibold text-gazety-dark">{{ ba.author }}</span>
         @if (ba.author_role) { <span>· {{ ba.author_role }}</span> }
         @if (ba.read_minutes) { <span>· {{ ba.read_minutes }} {{ i18n.isFrench() ? 'min de lecture' : 'min read' }}</span> }
-        <span>· {{ ba.views }} {{ i18n.isFrench() ? 'vues' : 'views' }}</span>
+        @if (auth.currentUser()?.is_admin) { <span>· {{ ba.views }} {{ i18n.isFrench() ? 'vues' : 'views' }}</span> }
       </div>
     </header>
 
@@ -86,6 +86,15 @@
             {{ i18n.isFrench() ? 'Copier le lien' : 'Copy link' }}
           </button>
 
+          <!-- Modifier (admin) : accès direct à l'édition sans repasser par Gestion des articles -->
+          @if (auth.currentUser()?.is_admin) {
+            <a [routerLink]="['/gestion-articles', ba.id, 'modifier']"
+               class="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-silver-300 text-gazety-dark text-sm font-semibold hover:bg-silver-100 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              {{ i18n.isFrench() ? 'Modifier' : 'Edit' }}
+            </a>
+          }
+
           <!-- Enregistrer (comptes connectés) -->
           @if (auth.isLoggedIn()) {
             <button (click)="toggleFavorite()" [disabled]="favLoading()"
@@ -117,7 +126,7 @@
                 <div class="p-5 flex flex-col gap-2 flex-1">
                   <p class="text-[10px] uppercase tracking-wide text-gazety-red font-semibold">{{ sectorLabel(r.sector) }}</p>
                   <h3 class="font-display font-bold text-xl text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ r.title }}</h3>
-                  @if (r.description) {
+                  @if (r.excerpt) {
                     <p class="text-sm text-silver-600 leading-relaxed line-clamp-3">
                       {{ relatedExcerpt(r) }}…
                       <span class="text-gazety-red font-semibold whitespace-nowrap">{{ i18n.isFrench() ? 'lire la suite' : 'read more' }}</span>

@@ -1,5 +1,6 @@
 import { Component, ElementRef, EventEmitter, Input, Output, ViewChild, AfterViewInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { normalizeExternalUrl } from '../../utils/url';
 
 /**
  * Éditeur de texte enrichi (contenteditable + execCommand), façon traitement de texte :
@@ -102,9 +103,9 @@ import { CommonModule } from '@angular/common';
     </div>
   `,
   styles: [`
-    .re-btn { display:inline-flex; align-items:center; justify-content:center; min-width:1.9rem; height:1.9rem; padding:0 .3rem; border-radius:.25rem; font-size:.8rem; color:#1d1d1f; }
-    .re-btn:hover { background:#e2e5e9; }
-    .re-sep { width:1px; height:1.2rem; background:#cbd0d6; margin:0 .2rem; }
+    .re-btn { display:inline-flex; align-items:center; justify-content:center; min-width:1.9rem; height:1.9rem; padding:0 .3rem; border-radius:.25rem; font-size:.8rem; color:var(--color-ink, #1d1d1f); }
+    .re-btn:hover { background:var(--color-tint, #e2e5e9); }
+    .re-sep { width:1px; height:1.2rem; background:var(--color-border, #cbd0d6); margin:0 .2rem; }
   `],
 })
 export class RichEditorComponent implements AfterViewInit, OnChanges {
@@ -192,9 +193,44 @@ export class RichEditorComponent implements AfterViewInit, OnChanges {
     this.styled('hiliteColor', this.hiliteColor);
   }
 
+  /** Insère un lien. Fonctionne AVEC une sélection (le texte choisi devient le lien)
+   *  ou SANS (on saisit le texte à afficher). Le schéma est optionnel : « exemple.com »
+   *  devient « https://exemple.com ». Les liens s'ouvrent dans un nouvel onglet. */
   makeLink() {
-    const url = window.prompt('Adresse du lien (https://…)', 'https://');
-    if (url && /^https?:\/\//i.test(url)) this.cmd('createLink', url);
+    this.saveSel();
+    const sel = window.getSelection();
+    const hasText = !!sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+      && this.ed.nativeElement.contains(sel.anchorNode);
+
+    const raw = window.prompt(hasText ? 'Adresse du lien (ex : exemple.com)' : 'Adresse du lien (ex : exemple.com)', 'https://');
+    if (raw === null) return;                 // annulé
+    const url = normalizeExternalUrl(raw);
+    if (!url || url === 'https://') return;   // vide
+
+    this.restoreSel();
+    if (hasText) {
+      this.cmd('createLink', url);
+    } else {
+      // Pas de sélection : on demande le libellé et on insère le lien.
+      const label = (window.prompt('Texte à afficher', raw.trim()) || url).trim();
+      const safe = label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const href = url.replace(/"/g, '%22');
+      document.execCommand('insertHTML', false, `<a href="${href}">${safe}</a>`);
+    }
+    this.decorateLinks();
+  }
+
+  /** Normalise le href de tous les liens et les ouvre en toute sécurité dans un nouvel onglet. */
+  private decorateLinks() {
+    for (const a of Array.from(this.ed.nativeElement.querySelectorAll('a'))) {
+      const href = normalizeExternalUrl(a.getAttribute('href'));
+      if (href) a.setAttribute('href', href);
+      if (/^https?:/i.test(href)) {
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer nofollow');
+      }
+    }
+    this.onInput();
   }
   clearFormat() { this.cmd('removeFormat'); this.cmd('formatBlock', '<p>'); }
 

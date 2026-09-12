@@ -62,10 +62,20 @@ export class AppComponent {
 
     // Lien d'invitation admin (?invite=TOKEN) : ouvre l'inscription avec le jeton, puis nettoie l'URL.
     try {
-      const token = new URLSearchParams(window.location.search).get('invite');
-      if (token) {
-        this.authModal.inviteToken.set(token);
+      const params = new URLSearchParams(window.location.search);
+      const invite = params.get('invite');
+      if (invite) {
+        this.authModal.inviteToken.set(invite);
         this.authModal.open('signup');
+        const url = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', url);
+      }
+      // Lien de réinitialisation (?reset=TOKEN) reçu par email : ouvre la modale sur le
+      // formulaire « nouveau mot de passe », puis nettoie l'URL (le jeton ne reste pas visible).
+      const reset = params.get('reset');
+      if (reset) {
+        this.authModal.resetToken.set(reset);
+        this.authModal.open('login');
         const url = window.location.pathname + window.location.hash;
         window.history.replaceState({}, '', url);
       }

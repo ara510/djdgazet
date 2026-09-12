@@ -14,7 +14,7 @@
     <div class="auth-panel__footer">
       <p class="auth-panel__tagline">{{ lang.t('auth.panel.tagline') }}</p>
       <hr class="auth-panel__rule" />
-      @if (tab() === 'login' && !forgotPasswordView()) {
+      @if (tab() === 'login' && !forgotPasswordView() && !resetPasswordView()) {
         <p class="auth-panel__switch-text">{{ lang.t('auth.panel.no_account') }}</p>
         <button class="auth-panel__switch-btn" type="button" (click)="switchTab('signup')">
           {{ lang.t('auth.panel.join') }} →
@@ -44,7 +44,7 @@
     </button>
 
     <!-- LOGIN -->
-    @if (tab() === 'login' && !forgotPasswordView()) {
+    @if (tab() === 'login' && !forgotPasswordView() && !resetPasswordView()) {
       <form class="auth-form" (ngSubmit)="onLogin()" #lf="ngForm">
         <h2 class="auth-form__title">{{ lang.t('auth.login.title') }}</h2>
 
@@ -131,6 +131,81 @@
       </div>
     }
 
+    <!-- NOUVEAU MOT DE PASSE (via lien ?reset=…) -->
+    @if (resetPasswordView()) {
+      <div class="auth-form auth-form--forgot">
+        <h2 class="auth-form__title">
+          {{ lang.lang() === 'fr' ? 'Nouveau mot de passe' : 'New password' }}
+        </h2>
+        <p class="auth-form__desc">
+          {{ lang.lang() === 'fr'
+            ? 'Choisissez un nouveau mot de passe pour votre compte.'
+            : 'Choose a new password for your account.' }}
+        </p>
+
+        <div class="auth-form__field">
+          <label class="auth-form__label">{{ lang.lang() === 'fr' ? 'Nouveau mot de passe' : 'New password' }}</label>
+          <div class="auth-form__pwd-wrap">
+            <input class="auth-form__input" [type]="showResetPwd() ? 'text' : 'password'" name="resetPassword"
+                   [(ngModel)]="reset.password" autocomplete="new-password" placeholder="••••••••" />
+            <button class="auth-form__eye" type="button" (click)="showResetPwd.set(!showResetPwd())" tabindex="-1">
+              @if (showResetPwd()) {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-form__field">
+          <label class="auth-form__label">{{ lang.lang() === 'fr' ? 'Confirmer le mot de passe' : 'Confirm password' }}</label>
+          <div class="auth-form__pwd-wrap">
+            <input class="auth-form__input" [type]="showResetConfirm() ? 'text' : 'password'" name="resetPasswordConfirm"
+                   [(ngModel)]="reset.passwordConfirm" autocomplete="new-password" placeholder="••••••••" />
+            <button class="auth-form__eye" type="button" (click)="showResetConfirm.set(!showResetConfirm())" tabindex="-1">
+              @if (showResetConfirm()) {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
+
+        <p class="auth-form__desc" style="margin-top:-0.4rem;font-size:0.72rem;">
+          {{ lang.lang() === 'fr'
+            ? '8 caractères min., une majuscule, un chiffre et un symbole.'
+            : 'At least 8 chars, one uppercase, one digit and one symbol.' }}
+        </p>
+
+        <button class="auth-form__submit" type="button" (click)="onResetPassword()"
+                [disabled]="loading() || !resetPwdValid || reset.password !== reset.passwordConfirm">
+          {{ loading()
+            ? (lang.lang() === 'fr' ? 'Enregistrement…' : 'Saving…')
+            : (lang.lang() === 'fr' ? 'Réinitialiser' : 'Reset password') }}
+        </button>
+
+        <button class="auth-form__back" type="button" (click)="resetPasswordView.set(false); authModal.resetToken.set(null)">
+          ← {{ lang.lang() === 'fr' ? 'Retour à la connexion' : 'Back to sign in' }}
+        </button>
+      </div>
+    }
+
     <!-- OTP VERIFICATION -->
     @if (otpView()) {
       <div class="auth-form auth-form--otp">
@@ -177,7 +252,7 @@
     }
 
     <!-- SIGN UP -->
-    @if (tab() === 'signup' && !forgotPasswordView() && !otpView()) {
+    @if (tab() === 'signup' && !forgotPasswordView() && !otpView() && !resetPasswordView()) {
       <form class="auth-form auth-form--signup" (ngSubmit)="onSignup()" #sf="ngForm">
         <h2 class="auth-form__title">{{ lang.t('auth.signup.title') }}</h2>
 

@@ -267,6 +267,7 @@
   white-space: nowrap;
   transition: color 0.2s, border-color 0.2s, background 0.2s;
   &--msg:hover { color: var(--color-accent); border-color: var(--color-accent); }
+  &--reset:hover { color: var(--color-accent); border-color: var(--color-accent); }
   &--del { color: #c0392b; border-color: rgba(192,57,43,0.4); }
   &--del:hover { color: #fff; background: #c0392b; border-color: #c0392b; }
 }

@@ -24,7 +24,7 @@
     </div>
 
     @if (loading() && items().length === 0) {
-      <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+      <app-loader />
     } @else if (items().length === 0) {
       @if (search().trim()) {
         <p class="text-silver-500 text-sm">{{ fr() ? 'Aucun résultat pour « ' + search().trim() + ' ».' : 'No result for “' + search().trim() + '”.' }}</p>
@@ -163,7 +163,7 @@
             </button>
           </div>
         } @else if (loading()) {
-          <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+          <app-loader />
         } @else if (!hasMore()) {
           <p class="text-silver-400 text-xs">{{ fr() ? 'Fin du fil.' : 'End of feed.' }}</p>
         }

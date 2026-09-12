@@ -160,7 +160,7 @@
     <!-- Liste des articles (page distincte du formulaire) -->
     @if (!formOpen()) {
     @if (loading()) {
-      <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+      <app-loader />
     } @else if (articles().length === 0) {
       <p class="text-silver-500 text-sm">{{ fr() ? 'Aucun article pour le moment.' : 'No articles yet.' }}</p>
     } @else {

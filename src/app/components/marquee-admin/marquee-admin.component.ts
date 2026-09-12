@@ -109,9 +109,12 @@ export class MarqueeAdminComponent {
   close() { this.marquee.closeAdmin(); }
 
   save() {
+    // On conserve les vitesses globales existantes (réglées via les sliders) pour
+    // ne pas les réinitialiser en enregistrant le texte des bandes.
     const payload = {
-      top:  { enabled: this.topEnabled,  items: this.lines(this.topText) },
-      home: { enabled: this.homeEnabled, items: this.lines(this.homeText) },
+      top:  { enabled: this.topEnabled,  items: this.lines(this.topText),  speed: this.marquee.topSpeed() },
+      home: { enabled: this.homeEnabled, items: this.lines(this.homeText), speed: this.marquee.homeSpeed() },
+      breaking: { speed: this.marquee.breakingSpeed() },
     };
     this.marquee.save(payload).subscribe({
       next: s => {

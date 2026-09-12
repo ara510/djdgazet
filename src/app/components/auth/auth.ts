@@ -39,10 +39,21 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
   forgotPasswordView = signal(false);
   forgotDone        = signal(false);
   otpView           = signal(false);
+  resetPasswordView = signal(false);
 
   showLoginPwd   = signal(false);
   showPwd        = signal(false);
   showConfirmPwd = signal(false);
+  showResetPwd        = signal(false);
+  showResetConfirm    = signal(false);
+
+  reset = { password: '', passwordConfirm: '' };
+
+  constructor() {
+    // Si on est arrivé via un lien de réinitialisation (?reset=…), on ouvre directement
+    // le formulaire « nouveau mot de passe ».
+    if (this.authModal.resetToken()) this.resetPasswordView.set(true);
+  }
 
   private anim!: AnimationItem;
   private loadAnim?: AnimationItem;
@@ -160,6 +171,58 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
       }, start),
       error: (err) => this.finishLoading(() => {
         this.toast.show(err.error?.error || 'Erreur lors de l\'inscription.', 'error');
+      }, start),
+    });
+  }
+
+  /** Force du nouveau mot de passe (reset) — même barème que l'inscription. */
+  get resetStrength(): 0 | 1 | 2 | 3 {
+    const p = this.reset.password;
+    if (!p) return 0;
+    let score = 0;
+    if (p.length >= 8)          score++;
+    if (/[a-z]/.test(p))        score++;
+    if (/[A-Z]/.test(p))        score++;
+    if (/[0-9]/.test(p))        score++;
+    if (/[^a-zA-Z0-9]/.test(p)) score++;
+    if (score <= 2) return 1;
+    if (score <= 3) return 2;
+    return 3;
+  }
+  /** Règles minimales exigées par le serveur : 8+, une majuscule, un chiffre, un symbole. */
+  get resetPwdValid(): boolean {
+    const p = this.reset.password;
+    return p.length >= 8 && /[A-Z]/.test(p) && /[0-9]/.test(p) && /[^a-zA-Z0-9]/.test(p);
+  }
+
+  onResetPassword() {
+    const token = this.authModal.resetToken();
+    if (this.loading() || !token) return;
+    if (!this.resetPwdValid) {
+      this.toast.show(this.lang.lang() === 'fr'
+        ? 'Mot de passe : 8 caractères min., une majuscule, un chiffre et un symbole.'
+        : 'Password: at least 8 chars, one uppercase, one digit and one symbol.', 'error');
+      return;
+    }
+    if (this.reset.password !== this.reset.passwordConfirm) {
+      this.toast.show(this.lang.lang() === 'fr' ? 'Les mots de passe ne correspondent pas.' : 'Passwords do not match.', 'error');
+      return;
+    }
+    this.loading.set(true);
+    this.loadAnim?.play();
+    const start = Date.now();
+    this.auth.resetPassword(token, this.reset.password).subscribe({
+      next: () => this.finishLoading(() => {
+        this.authModal.resetToken.set(null);
+        this.resetPasswordView.set(false);
+        this.reset = { password: '', passwordConfirm: '' };
+        this.tab.set('login');
+        this.toast.show(this.lang.lang() === 'fr'
+          ? 'Mot de passe réinitialisé ! Connectez-vous.'
+          : 'Password reset! Please sign in.', 'success');
+      }, start),
+      error: (err) => this.finishLoading(() => {
+        this.toast.show(err.error?.error || (this.lang.lang() === 'fr' ? 'Lien invalide ou expiré.' : 'Invalid or expired link.'), 'error');
       }, start),
     });
   }

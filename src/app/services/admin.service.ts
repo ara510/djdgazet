@@ -222,4 +222,11 @@ export class AdminService {
       `/api/users/${id}/message`, { body }, { headers: this.headers() }
     );
   }
+
+  /** SUPER-ADMIN (ara510) : envoie à l'utilisateur un lien de réinitialisation de mot de passe. */
+  sendResetLink(id: number) {
+    return this.http.post<{ ok: boolean; email: string }>(
+      `/api/users/${id}/reset-link`, {}, { headers: this.headers() }
+    );
+  }
 }

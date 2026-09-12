@@ -9,13 +9,14 @@ import { ToastService } from '../../services/toast.service';
 import { ArticleService, ArticleItem } from '../../services/article.service';
 import { isoToFr, frToIso } from '../../utils/date-fr';
 import { RichEditorComponent } from '../../components/rich-editor/rich-editor.component';
+import { LoaderComponent } from '../../components/loader/loader.component';
 
 const SECTORS = ['politique', 'economie', 'international', 'social', 'environnement', 'agriculture', 'tourisme', 'mines', 'telecoms', 'chronique', 'autre'];
 
 @Component({
   selector: 'app-article-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RichEditorComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RichEditorComponent, LoaderComponent],
   templateUrl: './article-admin.component.html',
 })
 export class ArticleAdminComponent {
@@ -111,7 +112,17 @@ export class ArticleAdminComponent {
     this.formOpen.set(true);
   }
 
+  /** La LISTE ne transporte plus le contenu intégral (allègement du payload) : on récupère
+   *  l'article complet avant d'ouvrir le formulaire, sinon on écraserait la description et la
+   *  galerie à l'enregistrement. */
   edit(a: ArticleItem) {
+    this.articlesSvc.getForEdit(a.id).subscribe({
+      next: full => this.fillForm(full),
+      error: () => this.toast.show(this.fr() ? 'Chargement de l\'article impossible.' : 'Could not load the article.', 'error'),
+    });
+  }
+
+  private fillForm(a: ArticleItem) {
     this.editingId.set(a.id);
     this.fSector.set(a.sector); this.fTitle.set(a.title); this.fDescription.set(a.description ?? '');
     this.fAuthor.set(a.author); this.fAuthorRole.set(a.author_role ?? ''); this.fDate.set(isoToFr(a.published_at));

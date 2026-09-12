@@ -222,7 +222,7 @@ db.query(`
 const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour.com').toLowerCase();
 // Admins permanents par identifiant (comptes hors domaine) : re-promus à chaque boot ET
 // jamais rétrogradés par la synchro ci-dessous. Ajouter/retirer un identifiant ici.
-const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8'];
+const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8', 'ntso'];
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE $1 AND is_admin = FALSE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(username) = ANY($1) AND is_admin = FALSE`, [BOOT_ADMIN_USERNAMES]).catch(() => {});
 db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND LOWER(username) <> ALL($2) AND admin_locked = FALSE AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN, BOOT_ADMIN_USERNAMES]).catch(() => {});
@@ -452,6 +452,23 @@ async function requireAdmin(req, res, next) {
     const { rows } = await db.query('SELECT is_admin, email_verified FROM users WHERE id = $1', [req.user.id]);
     if (!rows.length || !rows[0].is_admin) return res.status(403).json({ error: 'Accès réservé à l\'équipe DJD.' });
     if (!rows[0].email_verified) return res.status(403).json({ error: 'Veuillez vérifier votre email pour accéder aux fonctionnalités admin.' });
+    next();
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+}
+
+// Super-administrateur unique : seul ce compte précis (identifiant ET email) peut
+// déclencher l'envoi d'un lien de réinitialisation à un autre utilisateur.
+const SUPER_ADMIN = { username: 'ara510', email: 'nathan@dujardin-delacour.com' };
+async function requireSuperAdmin(req, res, next) {
+  try {
+    const { rows } = await db.query('SELECT username, email, is_admin FROM users WHERE id = $1', [req.user.id]);
+    const u = rows[0];
+    if (!u || !u.is_admin
+        || u.username !== SUPER_ADMIN.username
+        || (u.email || '').toLowerCase() !== SUPER_ADMIN.email)
+      return res.status(403).json({ error: 'Action réservée au super-administrateur.' });
     next();
   } catch {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1130,16 +1147,75 @@ app.post('/api/users/:id/message', requireAuth, requireAdmin, async (req, res) =
   }
 });
 
+// ─── POST /api/users/:id/reset-link — envoyer un lien de réinitialisation (SUPER-ADMIN) ─
+// Réservé à ara510. N'expose JAMAIS le mot de passe (haché) : envoie à l'utilisateur le
+// même lien sécurisé que « mot de passe oublié » (jeton signé, valable 15 min).
+app.post('/api/users/:id/reset-link', requireAuth, requireSuperAdmin, async (req, res) => {
+  const targetId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(targetId)) return res.status(400).json({ error: 'Identifiant invalide.' });
+  try {
+    const { rows } = await db.query(
+      'SELECT id, nom, email FROM users WHERE id = $1 AND deleted_at IS NULL', [targetId]);
+    const target = rows[0];
+    if (!target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (!target.email) return res.status(400).json({ error: 'Ce compte n\'a pas d\'adresse email.' });
+
+    const resetToken = jwt.sign({ id: target.id, type: 'pwd_reset' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const resetUrl   = `${APP_URL}?reset=${resetToken}`;
+
+    await resend.emails.send({
+      from:    SENDER_FROM,
+      to:      target.email,
+      subject: `Réinitialisation de mot de passe — ${BRAND_NAME}`,
+      html: emailLayout(`
+        <h2 style="font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 8px;">Réinitialisation de mot de passe</h2>
+        <p style="font-size:0.85rem;color:#3A4A63;margin:0 0 28px;line-height:1.6;">
+          Bonjour ${target.nom},<br/>
+          Un administrateur de ${BRAND_NAME} a initié la réinitialisation de votre mot de passe.
+          Cliquez sur le bouton ci-dessous pour en créer un nouveau. Ce lien expire dans <strong>15 minutes</strong>.
+        </p>
+        <div style="text-align:center;margin:0 0 28px;">
+          <a href="${resetUrl}" style="display:inline-block;background:#1E5FD4;color:#fff;text-decoration:none;padding:12px 32px;font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;border-radius:2px;">
+            Réinitialiser mon mot de passe
+          </a>
+        </div>
+        <p style="font-size:0.75rem;color:#6C7A93;margin:0;">
+          Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail : votre mot de passe reste inchangé.
+        </p>
+      `),
+    });
+
+    logActivity(req, 'user.reset_link', `#${target.id}`);
+    // On renvoie l'email masqué (jamais le mot de passe, qui est haché et irrécupérable).
+    const masked = target.email.replace(/^(.).*(@.*)$/, (_, a, b) => a + '***' + b);
+    res.json({ ok: true, email: masked });
+  } catch (err) {
+    console.error('Reset-link error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // ─── Bandes marquee « actualités & faits marquants » (contrôlées par l'admin) ──
 // Bande 1 (`top`) = sous le header, sur tout le site. Bande 2 (`home`) = accueil,
 // juste avant « Veille média ». Lecture publique ; écriture admin.
-const MARQUEE_KEYS = { top: 'marquee_top', home: 'marquee_home' };
-const MARQUEE_DEFAULT = { enabled: false, items: [] };
+const MARQUEE_KEYS = { top: 'marquee_top', home: 'marquee_home', breaking: 'marquee_breaking' };
+const MARQUEE_DEFAULT = { enabled: false, items: [], speed: 5 };
+
+/** Vitesse de défilement : entier 1 (lent) … 10 (rapide) ; défaut 5. */
+function clampSpeed(n) {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return 5;
+  return Math.min(10, Math.max(1, v));
+}
 
 async function readMarqueeBand(key) {
   const { rows } = await db.query('SELECT value FROM app_settings WHERE key = $1', [key]);
   const v = rows[0]?.value || MARQUEE_DEFAULT;
-  return { enabled: !!v.enabled, items: Array.isArray(v.items) ? v.items : [] };
+  return {
+    enabled: !!v.enabled,
+    items: Array.isArray(v.items) ? v.items : [],
+    speed: clampSpeed(v.speed ?? 5),
+  };
 }
 
 function cleanMarqueeBand(band) {
@@ -1148,27 +1224,35 @@ function cleanMarqueeBand(band) {
     items: Array.isArray(band && band.items)
       ? band.items.map(s => String(s).trim()).filter(Boolean).slice(0, 30)
       : [],
+    speed: clampSpeed(band && band.speed),
   };
 }
 
 app.get('/api/marquee', async (req, res) => {
   try {
-    const [top, home] = await Promise.all([
+    const [top, home, breaking] = await Promise.all([
       readMarqueeBand(MARQUEE_KEYS.top),
       readMarqueeBand(MARQUEE_KEYS.home),
+      readMarqueeBand(MARQUEE_KEYS.breaking),
     ]);
-    res.json({ top, home });
+    // La bande « En continu » (titres de veille) n'a qu'une vitesse réglable.
+    res.json({ top, home, breaking: { speed: breaking.speed } });
   } catch (err) {
     console.error('Marquee get error:', err);
-    res.json({ top: MARQUEE_DEFAULT, home: MARQUEE_DEFAULT });
+    res.json({ top: MARQUEE_DEFAULT, home: MARQUEE_DEFAULT, breaking: { speed: 5 } });
   }
 });
 
 app.put('/api/marquee', requireAuth, requireAdmin, async (req, res) => {
   const top  = cleanMarqueeBand(req.body.top);
   const home = cleanMarqueeBand(req.body.home);
+  const breaking = { speed: clampSpeed(req.body.breaking && req.body.breaking.speed) };
   try {
-    for (const [key, value] of [[MARQUEE_KEYS.top, top], [MARQUEE_KEYS.home, home]]) {
+    for (const [key, value] of [
+      [MARQUEE_KEYS.top, top],
+      [MARQUEE_KEYS.home, home],
+      [MARQUEE_KEYS.breaking, breaking],
+    ]) {
       await db.query(
         `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())
          ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
@@ -1177,7 +1261,7 @@ app.put('/api/marquee', requireAuth, requireAdmin, async (req, res) => {
     }
     logActivity(req, 'marquee.update',
       `top:${top.enabled ? 'ON' : 'OFF'}(${top.items.length}) home:${home.enabled ? 'ON' : 'OFF'}(${home.items.length})`);
-    res.json({ top, home });
+    res.json({ top, home, breaking });
   } catch (err) {
     console.error('Marquee update error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1549,8 +1633,16 @@ app.get('/api/veille/quota', requireAuth, async (req, res) => {
 
 // GET /api/veille — liste (tous les connectés), filtres optionnels ?type=&sector=&q=
 // Filtrage par abonnement : un compte ne reçoit que les secteurs autorisés par son plan.
+const VEILLE_PAGE_SIZE = 40; // taille d'une page du fil veille (défilement « charger plus »)
+
 app.get('/api/veille', requireAuth, async (req, res) => {
   const { type, sector, q, from, to, category } = req.query;
+  // Pagination (le fil dépasse largement le millier d'éléments à terme).
+  const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || VEILLE_PAGE_SIZE));
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  // Filtre de lecture appliqué en SQL : sinon « non lus » / « favoris » ne chercheraient que
+  // dans la page déjà chargée au lieu de tout le fil.
+  const reading = ['unread', 'favorites'].includes(req.query.reading) ? req.query.reading : 'all';
   const where = [];
   const params = [req.user.id]; // $1 = état (favori/lu) du compte courant
 
@@ -1583,11 +1675,41 @@ app.get('/api/veille', requireAuth, async (req, res) => {
     // Filtre par période (dates en heure locale Madagascar)
     if (from)   { params.push(from); where.push(`${dlocal('vi.published_at')} >= $${params.length}::date`); }
     if (to)     { params.push(to);   where.push(`${dlocal('vi.published_at')} <= $${params.length}::date`); }
-    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    // Base = tous les filtres SAUF la lecture : sert à compter les badges « non lus » /
+    // « favoris » sur l'ENSEMBLE du fil filtré, pas seulement sur la page affichée.
+    const baseClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const readingSql = reading === 'favorites' ? `COALESCE(vs.favorite, FALSE) = TRUE`
+                     : reading === 'unread'    ? `COALESCE(vs.is_read,  FALSE) = FALSE`
+                     : '';
+    const clause = readingSql
+      ? (baseClause ? `${baseClause} AND ${readingSql}` : `WHERE ${readingSql}`)
+      : baseClause;
 
+    const counts = await db.query(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE NOT COALESCE(vs.is_read, FALSE))::int AS unread,
+              COUNT(*) FILTER (WHERE COALESCE(vs.favorite, FALSE))::int     AS favorites
+       FROM veille_items vi
+       LEFT JOIN veille_states vs ON vs.veille_id = vi.id AND vs.user_id = $1
+       ${baseClause}`,
+      params
+    );
+    const c = counts.rows[0] || { total: 0, unread: 0, favorites: 0 };
+    const matching = reading === 'favorites' ? c.favorites : reading === 'unread' ? c.unread : c.total;
+
+    // Projection « liste ». Le poids dépend du mode de lecture du visiteur :
+    //  - abonné payant → mode « fil » : il lit la veille EN ENTIER sans cliquer, donc on envoie
+    //    l'extrait complet + trends/signals (les alléger couperait le texte à l'écran) ;
+    //  - admin / Générale → cartes compactes (2-3 lignes) avec clic pour ouvrir le détail :
+    //    extrait tronqué et pas de trends/signals, chargés à l'ouverture.
+    // Dans tous les cas on retire `images` (tableau complet) : seul `images_count` sert aux cartes.
+    const feedMode = !isAdmin && userLevel >= 1;
+    const excerptSql = feedMode ? 'vi.excerpt' : 'left(vi.excerpt, 300) AS excerpt';
+    const longFields = feedMode ? 'vi.trends, vi.signals,' : '';
     const { rows } = await db.query(
-      `SELECT vi.id, vi.title, vi.source, vi.sources, vi.source_type, vi.source_types, vi.social_network, vi.social_networks, vi.sector, vi.sectors, vi.tone, vi.url, vi.urls, vi.excerpt, vi.image, vi.images, vi.video, vi.author,
-              vi.category, vi.trends, vi.signals, vi.tags, vi.media_dediee, vi.justify,
+      `SELECT vi.id, vi.title, vi.source, vi.sources, vi.source_type, vi.source_types, vi.social_network, vi.social_networks, vi.sector, vi.sectors, vi.tone, vi.url, vi.urls,
+              ${excerptSql}, vi.image, vi.author, ${longFields}
+              vi.category, vi.tags, vi.media_dediee, vi.justify,
               COALESCE(array_length(vi.images, 1), 0) AS images_count,
               (vi.video IS NOT NULL) AS has_video,
               vi.status, vi.pinned, vi.published_at, ${scheduledSql('vi.published_at')} AS scheduled, vi.created_at,
@@ -1596,16 +1718,25 @@ app.get('/api/veille', requireAuth, async (req, res) => {
        FROM veille_items vi
        LEFT JOIN veille_states vs ON vs.veille_id = vi.id AND vs.user_id = $1
        ${clause}
-       ORDER BY vi.pinned DESC, vi.published_at DESC, vi.id DESC LIMIT 200`,
-      params
+       ORDER BY vi.pinned DESC, vi.published_at DESC, vi.id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
     );
     // Médias réservés à la Dédiée : on masque photo/vidéo/lien aux autres abonnés (le reste de la veille reste visible).
     if (!canSeeMedia) {
       for (const r of rows) {
-        if (r.media_dediee) { r.image = null; r.images = null; r.images_count = 0; r.video = null; r.has_video = false; r.url = null; r.urls = null; }
+        if (r.media_dediee) { r.image = null; r.images_count = 0; r.has_video = false; r.url = null; r.urls = null; }
       }
     }
-    res.json(rows);
+    res.json({
+      items: rows,
+      total: matching,
+      unread: c.unread,
+      favorites: c.favorites,
+      offset,
+      limit,
+      hasMore: offset + rows.length < matching,
+    });
   } catch (err) {
     console.error('Veille list error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -2398,6 +2529,13 @@ app.delete('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
 // ─── Articles (rédigés par les admins) ──────────────────────────────────────────
 const ARTICLE_FIELDS = `id, sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, views, created_at`;
 
+// Projection « liste » : tout SAUF le contenu intégral (`description` HTML, parfois 68 Ko pour un
+// seul article, et le tableau `images`). À la place, un extrait en texte brut tronqué côté serveur
+// — seul élément réellement affiché dans les cartes. Divise le poids des listes par ~10.
+// Le contenu complet reste servi par GET /api/articles/:id (lecture) et l'édition admin.
+const ARTICLE_EXCERPT_SQL = `btrim(left(regexp_replace(regexp_replace(regexp_replace(coalesce(description, ''), '<[^>]*>', ' ', 'g'), '&nbsp;', ' ', 'gi'), '\\s+', ' ', 'g'), 300))`;
+const ARTICLE_LIST_FIELDS = `id, sector, title, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, views, created_at, ${ARTICLE_EXCERPT_SQL} AS excerpt`;
+
 // POST /api/articles (admin) — créer
 app.post('/api/articles', requireAuth, requireAdmin, async (req, res) => {
   const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images } = req.body;
@@ -2426,9 +2564,49 @@ app.get('/api/articles', async (req, res) => {
     const params = []; let where = 'deleted_at IS NULL';
     if (sector) { params.push(sector); where += ` AND sector = $${params.length}`; }
     const { rows } = await db.query(
-      `SELECT ${ARTICLE_FIELDS} FROM articles WHERE ${where} ORDER BY published_at DESC, id DESC LIMIT 100`, params);
+      `SELECT ${ARTICLE_LIST_FIELDS} FROM articles WHERE ${where} ORDER BY published_at DESC, id DESC LIMIT 500`, params);
     res.json(rows);
   } catch (err) { console.error('Article list error:', err); res.status(500).json({ error: 'Erreur serveur.' }); }
+});
+
+// ─── GET /api/search — recherche publique par mot-clé / titre ─────────────────
+// ?q=<texte>&type=article|veille. Articles : titre + contenu. Veilles : titre + extrait,
+// avec le même verrouillage (homeLock) que l'accueil selon l'abonnement du visiteur.
+app.get('/api/search', optionalAuth, async (req, res) => {
+  const q = (req.query.q || '').toString().trim().slice(0, 100);
+  const type = req.query.type === 'veille' ? 'veille' : 'article';
+  if (!q) return res.json({ type, q, results: [] });
+  const like = `%${q}%`;
+  const strip = (s) => String(s ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+  try {
+    if (type === 'article') {
+      const { rows } = await db.query(
+        `SELECT id, sector, title, description, image, image_alt, published_at
+         FROM articles
+         WHERE deleted_at IS NULL AND ${visibleSql('published_at')} AND (title ILIKE $1 OR description ILIKE $1)
+         ORDER BY published_at DESC, id DESC LIMIT 40`, [like]);
+      const results = rows.map(r => ({
+        id: r.id, sector: r.sector, title: r.title,
+        image: r.image, image_alt: r.image_alt, published_at: r.published_at,
+        excerpt: strip(r.description).slice(0, 180),
+      }));
+      return res.json({ type, q, results });
+    }
+    // Veilles : respect du gating (visiteur / Générale → contenu verrouillé).
+    let viewer = { isAdmin: false, level: 0 };
+    if (req.user) {
+      const u = await db.query('SELECT plan, is_admin FROM users WHERE id = $1', [req.user.id]);
+      if (u.rows.length) viewer = { isAdmin: !!u.rows[0].is_admin, level: PLAN_LEVEL[u.rows[0].plan] ?? 0 };
+    }
+    const where = `deleted_at IS NULL AND status = 'published' AND ${visibleSql('published_at')} AND (title ILIKE $1 OR excerpt ILIKE $1)`;
+    const { rows } = await db.query(
+      `SELECT ${HOME_VEILLE_SELECT} FROM veille_items WHERE ${where}
+       ORDER BY published_at DESC, id DESC LIMIT 40`, [like]);
+    return res.json({ type, q, results: rows.map(it => homeLock(it, viewer)) });
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
 });
 
 // ─── Articles de l'accueil (piloté par l'admin) ───────────────────────────────
@@ -2455,7 +2633,7 @@ app.get('/api/articles/home', async (req, res) => {
   try {
     const cfg = await readHomeArticlesSettings();
     const { rows } = await db.query(
-      `SELECT ${ARTICLE_FIELDS} FROM articles WHERE deleted_at IS NULL
+      `SELECT ${ARTICLE_LIST_FIELDS} FROM articles WHERE deleted_at IS NULL
        ORDER BY published_at DESC, id DESC LIMIT 100`);
     const hidden = new Set(cfg.hidden);
     const visible = rows.filter(a => !hidden.has(a.id));
@@ -2514,9 +2692,16 @@ app.put('/api/articles/home/settings', requireAuth, requireAdmin, async (req, re
 // GET /api/articles/:id (public, auth optionnelle) — détail + incrémente les vues + état favori
 app.get('/api/articles/:id', optionalAuth, async (req, res) => {
   try {
-    const { rows } = await db.query(
-      `UPDATE articles SET views = views + 1 WHERE id = $1 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
-      [req.params.id]);
+    // `?count=0` : lecture sans compter de vue — utilisé par l'édition admin, qui récupère
+    // l'article complet pour remplir le formulaire et ne doit pas gonfler le compteur.
+    const countView = req.query.count !== '0';
+    const { rows } = countView
+      ? await db.query(
+          `UPDATE articles SET views = views + 1 WHERE id = $1 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
+          [req.params.id])
+      : await db.query(
+          `SELECT ${ARTICLE_FIELDS} FROM articles WHERE id = $1 AND deleted_at IS NULL`,
+          [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Article introuvable.' });
     const article = rows[0];
     // Articles = grand public : lecture complète pour tout le monde, sans compte.
@@ -2640,13 +2825,138 @@ app.get('/sitemap.xml', async (req, res) => {
   res.send(body);
 });
 
+// Remplace (ou injecte) le `content` d'une balise <meta property|name="key">.
+// Les balises du index.html utilisent des guillemets DOUBLES → on ne matche que ceux-ci
+// (sinon `[^"']*` s'arrêterait sur une apostrophe présente dans la valeur d'origine).
+function setMeta(html, kind, key, value) {
+  const k = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(<meta\\s+${kind}="${k}"\\s+content=)"[^"]*"`, 'i');
+  if (re.test(html)) return html.replace(re, `$1"${value}"`);
+  return html.replace(/<\/head>/i, `  <meta ${kind}="${key}" content="${value}">\n</head>`);
+}
+
+// Détecte le format RÉEL d'une image locale à partir de ses octets (jamais de l'extension,
+// pas fiable : des fichiers .jpg peuvent être autre chose) + ses dimensions, sans dépendance
+// externe. Ne reconnaît QUE JPEG/PNG/GIF — volontairement : AVIF et WEBP ne sont pas rendus de
+// façon fiable par l'aperçu de lien Messenger (constaté en prod : aperçu blanc) même quand
+// Facebook les affiche correctement. Renvoyer null pour ces formats permet à l'appelant de
+// retomber sur une image sûre (le logo) plutôt que de pointer vers un format qui casse l'aperçu.
+function readImageSize(absPath) {
+  try {
+    const buf = fs.readFileSync(absPath);
+    if (buf.length < 24) return null;
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) { // PNG
+      return { type: 'image/png', width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    if (buf.slice(0, 3).toString('ascii') === 'GIF') { // GIF
+      return { type: 'image/gif', width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+    }
+    if (buf[0] === 0xff && buf[1] === 0xd8) { // JPEG (couvre aussi .jfif, même format binaire)
+      let offset = 2;
+      while (offset < buf.length - 9) {
+        if (buf[offset] !== 0xff) { offset++; continue; }
+        const marker = buf[offset + 1];
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { type: 'image/jpeg', height: buf.readUInt16BE(offset + 5), width: buf.readUInt16BE(offset + 7) };
+        }
+        offset += 2 + buf.readUInt16BE(offset + 2);
+      }
+    }
+    return null; // AVIF, WEBP, ou format non reconnu → l'appelant retombe sur le logo
+  } catch { return null; }
+}
+
 // ─── Servir le front Angular en production ────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const DIST_FOLDER = path.join(__dirname, '..', 'dist', 'gazety-malagasy', 'browser');
+  const INDEX_HTML  = path.join(DIST_FOLDER, 'index.html');
   app.use(express.static(DIST_FOLDER));
+
+  // Aperçu de partage (Open Graph / Twitter Card) PAR ARTICLE : les réseaux sociaux
+  // n'exécutent pas Angular, ils lisent le HTML servi. On injecte donc le vrai titre,
+  // la description et l'IMAGE de l'article dans index.html avant de l'envoyer.
+  // `:slug` est optionnel et purement cosmétique (lien de partage lisible) : seul `:id` compte.
+  app.get('/article/:id{/:slug}', async (req, res, next) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) return next();
+    try {
+      const { rows } = await db.query(
+        'SELECT title, description, image, image_alt FROM articles WHERE id = $1 AND deleted_at IS NULL', [id]);
+      const a = rows[0];
+      if (!a) return next(); // article inconnu → SPA par défaut
+
+      let html = fs.readFileSync(INDEX_HTML, 'utf8');
+      const BASE = (APP_URL || '').replace(/\/+$/, '');
+      const esc  = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const strip = (s) => String(s ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ').trim();
+
+      const title = strip(a.title);
+      const truncate = (s, n) => {
+        if (s.length <= n) return s;
+        const cut = s.slice(0, n);
+        const sp = cut.lastIndexOf(' ');
+        return (sp > n * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + '…';
+      };
+      const desc    = truncate(strip(a.description), 200);
+      const isLocal = !!a.image && a.image.startsWith('/uploads/');
+      // Le format réel (octets, pas extension) doit être JPEG/PNG/GIF pour être fiable en
+      // aperçu Messenger — sinon (AVIF/WEBP/absent) on retombe sur le logo, toujours sûr.
+      const imgSize = isLocal ? readImageSize(path.join(__dirname, a.image)) : null;
+      let img, imgType;
+      if (isLocal && imgSize) {
+        img = BASE + a.image;
+        imgType = imgSize.type;
+      } else if (a.image && /^https?:\/\//i.test(a.image)) {
+        img = a.image; // image externe : format non vérifiable côté serveur, on fait confiance
+        imgType = 'image/jpeg';
+      } else {
+        img = `${BASE}/assets/haydlines-logo.png`;
+        imgType = 'image/png';
+      }
+      // Toujours canonique SANS le slug (une seule identité d'objet OG, quelle que soit
+      // l'URL visitée — /article/62 ou /article/62/mon-titre pointent vers la même ressource).
+      const url      = `${BASE}/article/${id}`;
+
+      const eTitle = esc(`${title} — MG Headlines`);
+      const eDesc  = esc(desc);
+      const eImg   = esc(img);
+      const eUrl   = esc(url);
+      const eAlt   = esc(strip(a.image_alt) || title);
+
+      html = html.replace(/<title>[^<]*<\/title>/i, `<title>${eTitle}</title>`);
+      html = setMeta(html, 'name',     'description',     eDesc);
+      html = setMeta(html, 'property', 'og:type',         'article');
+      html = setMeta(html, 'property', 'og:title',        eTitle);
+      html = setMeta(html, 'property', 'og:description',  eDesc);
+      html = setMeta(html, 'property', 'og:url',          eUrl);
+      html = setMeta(html, 'property', 'og:image',        eImg);
+      html = setMeta(html, 'property', 'og:image:secure_url', eImg);
+      html = setMeta(html, 'property', 'og:image:type',   imgType);
+      html = setMeta(html, 'property', 'og:image:alt',    eAlt);
+      if (imgSize) {
+        html = setMeta(html, 'property', 'og:image:width',  String(imgSize.width));
+        html = setMeta(html, 'property', 'og:image:height', String(imgSize.height));
+      }
+      html = setMeta(html, 'name',     'twitter:card',    'summary_large_image');
+      html = setMeta(html, 'name',     'twitter:title',   eTitle);
+      html = setMeta(html, 'name',     'twitter:description', eDesc);
+      html = setMeta(html, 'name',     'twitter:image',   eImg);
+      html = setMeta(html, 'name',     'twitter:image:alt', eAlt);
+
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      res.set('Cache-Control', 'public, max-age=300');
+      return res.send(html);
+    } catch (err) {
+      console.error('OG article error:', err);
+      return next(); // en cas de souci, on sert la SPA normale
+    }
+  });
+
   // Express 5 : '*' seul n'est plus un chemin valide, il faut un paramètre nommé.
   app.get('/{*splat}', (req, res) => {
-    res.sendFile(path.join(DIST_FOLDER, 'index.html'));
+    res.sendFile(INDEX_HTML);
   });
 }
 

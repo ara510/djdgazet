@@ -9,7 +9,7 @@
     </p>
 
     @if (loading()) {
-      <p class="vp__state">{{ fr ? 'Chargement…' : 'Loading…' }}</p>
+      <app-loader />
     } @else if (items().length === 0) {
       <p class="vp__state">{{ fr ? 'Aucune veille publiée pour le moment.' : 'No published watch items yet.' }}</p>
     } @else {

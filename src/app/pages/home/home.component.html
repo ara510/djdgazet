@@ -6,7 +6,7 @@
         <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>{{ fr() ? 'En continu' : 'Live' }}
       </span>
       <div class="relative flex-1 min-w-0 overflow-hidden group py-2">
-        <div class="flex items-center gap-8 w-max animate-marquee group-hover:[animation-play-state:paused]">
+        <div class="flex items-center gap-8 w-max animate-marquee group-hover:[animation-play-state:paused]" [style.animationDuration]="marqueeDuration() + 's'">
           @for (v of breaking(); track v.id) {
             <button type="button" (click)="openCard(v)" class="inline-flex items-center gap-2 whitespace-nowrap text-sm text-gazety-dark hover:text-gazety-red transition-colors">
               <span class="w-1 h-1 rounded-full shrink-0" [style.background]="categoryColor(v)"></span>{{ heading(v) }}
@@ -20,6 +20,28 @@
           }
         </div>
       </div>
+      <!-- Réglage de la vitesse de défilement — visible par les admins uniquement,
+           caché derrière une icône d'options (engrenage). -->
+      @if (isAdmin()) {
+        <div class="shrink-0 self-center flex items-center gap-2 pl-2">
+          @if (showMarqueeOpts()) {
+            <label class="hidden sm:inline-flex items-center gap-2 text-silver-500">
+              <span class="sr-only">{{ fr() ? 'Vitesse de défilement' : 'Scroll speed' }}</span>
+              <input type="range" min="1" max="10" step="1" class="marquee-speed w-16 md:w-20"
+                     [value]="marqueeSpeed()" (input)="onMarqueeSpeedInput($event)" (change)="onMarqueeSpeedCommit($event)"
+                     [attr.aria-label]="fr() ? 'Vitesse de défilement de la bande' : 'Ticker scroll speed'"
+                     [attr.aria-valuetext]="marqueeSpeed() + '/10'" />
+            </label>
+          }
+          <button type="button" (click)="toggleMarqueeOpts()"
+                  class="p-1 rounded-sm text-silver-500 hover:text-gazety-red transition-colors"
+                  [attr.aria-expanded]="showMarqueeOpts()"
+                  [attr.aria-label]="fr() ? 'Options de la bande' : 'Ticker options'"
+                  [title]="fr() ? 'Options (vitesse)' : 'Options (speed)'">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      }
     </div>
   </div>
 }
@@ -54,13 +76,13 @@
           <span class="text-silver-400">{{ timeAgo(h.published_at) }}</span>
         </div>
         <h1 class="font-display font-black text-3xl md:text-5xl text-gazety-dark leading-[1.05] group-hover:text-gazety-red transition-colors mb-3 text-balance">{{ h.title }}</h1>
-        @if (h.description) {
-          <p class="text-[15px] md:text-base text-silver-600 leading-relaxed line-clamp-3 mb-3 max-w-2xl">{{ excerpt(h.description, 240) }}…</p>
+        @if (h.excerpt) {
+          <p class="text-[15px] md:text-base text-silver-600 leading-relaxed line-clamp-3 mb-3 max-w-2xl">{{ excerpt(h.excerpt, 240) }}…</p>
         }
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-silver-500 mt-auto">
           <span class="font-semibold text-gazety-dark uppercase tracking-wide">{{ h.author }}</span>
           @if (h.read_minutes) { <span>· {{ h.read_minutes }} {{ fr() ? 'min de lecture' : 'min read' }}</span> }
-          <span>· {{ h.views }} {{ fr() ? 'vues' : 'views' }}</span>
+          @if (auth.currentUser()?.is_admin) { <span>· {{ h.views }} {{ fr() ? 'vues' : 'views' }}</span> }
         </div>
       </a>
 
@@ -99,12 +121,12 @@
   </div>
 
   @if (loadingArticles()) {
-    <p class="text-silver-500 text-sm text-center">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+    <app-loader />
   } @else if (noArticles()) {
     <p class="text-silver-500 text-sm text-center">{{ fr() ? 'Aucun article publié pour le moment.' : 'No articles published yet.' }}</p>
   } @else if (gridArticles().length) {
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      @for (a of gridArticles(); track a.id) {
+      @for (a of gridPreview(); track a.id) {
         <a [routerLink]="['/article', a.id]" class="tap-press group bg-white border border-silver-200 rounded-sm overflow-hidden flex flex-col hover:border-gazety-red transition-colors">
           @if (a.image) {
             <div class="h-44 bg-silver-100 overflow-hidden">
@@ -119,16 +141,26 @@
               <span class="text-silver-400 normal-case tracking-normal">{{ timeAgo(a.published_at) }}</span>
             </div>
             <h3 class="font-display font-bold text-lg text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</h3>
-            @if (a.description) {
-              <p class="text-sm text-silver-600 leading-relaxed line-clamp-2">{{ excerpt(a.description) }}…</p>
+            @if (a.excerpt) {
+              <p class="text-sm text-silver-600 leading-relaxed line-clamp-2">{{ excerpt(a.excerpt) }}…</p>
             }
             <div class="mt-auto pt-2 text-[11px] text-silver-500">
-              {{ a.author }}@if (a.read_minutes) { · {{ a.read_minutes }} min} · {{ a.views }} {{ fr() ? 'vues' : 'views' }}
+              {{ a.author }}@if (a.read_minutes) { · {{ a.read_minutes }} min}@if (auth.currentUser()?.is_admin) { · {{ a.views }} {{ fr() ? 'vues' : 'views' }}}
             </div>
           </div>
         </a>
       }
     </div>
+    @if (gridArticles().length > gridPreview().length) {
+      <div class="flex justify-center mt-10">
+        <a routerLink="/articles"
+           class="tap-press group inline-flex items-center gap-3 bg-gazety-red text-white font-bold uppercase tracking-[0.14em] text-sm px-8 py-4 rounded-sm shadow-lg shadow-gazety-red/25 hover:bg-gold-700 hover:shadow-xl transition-all">
+          {{ fr() ? 'Consulter tous les articles' : 'View all articles' }}
+          <span class="inline-flex items-center justify-center min-w-6 h-6 px-1.5 rounded-full bg-white/20 text-xs font-black">{{ gridArticles().length }}</span>
+          <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </div>
+    }
   }
 </section>
 
@@ -148,7 +180,7 @@
               <span class="font-display font-black text-2xl w-7 shrink-0 text-center leading-none" [style.color]="secColor(a.sector)">{{ i + 1 }}</span>
               <span class="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span class="font-display font-bold text-[15px] text-gazety-dark leading-snug line-clamp-2 group-hover:text-gazety-red transition-colors">{{ a.title }}</span>
-                <span class="text-[11px] text-silver-500">{{ sectorLabel(a.sector) }} · {{ a.views }} {{ fr() ? 'vues' : 'views' }}</span>
+                <span class="text-[11px] text-silver-500">{{ sectorLabel(a.sector) }}@if (auth.currentUser()?.is_admin) { · {{ a.views }} {{ fr() ? 'vues' : 'views' }}}</span>
               </span>
             </a>
           </li>
@@ -313,7 +345,7 @@
   }
 
   @if (latestLoading()) {
-    <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+    <app-loader />
   } @else if (latest().length === 0) {
     <p class="text-silver-500 text-sm">{{ fr() ? 'Aucune actualité pour le moment.' : 'No news yet.' }}</p>
   } @else {

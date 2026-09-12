@@ -11,7 +11,7 @@
     </div>
 
     @if (loading()) {
-      <p class="text-silver-500 text-sm">{{ fr() ? 'Chargement…' : 'Loading…' }}</p>
+      <app-loader />
     } @else {
       <!-- Articles -->
       <h2 class="font-display font-bold text-xl text-gazety-dark mb-4">{{ fr() ? 'Articles' : 'Articles' }}</h2>

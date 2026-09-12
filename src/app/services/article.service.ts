@@ -6,7 +6,10 @@ export interface ArticleItem {
   id: number;
   sector: string;
   title: string;
+  /** Contenu complet (HTML) — renvoyé uniquement par GET /api/articles/:id et l'écriture admin. */
   description?: string | null;
+  /** Extrait en texte brut tronqué côté serveur — c'est ce que servent les LISTES (cartes). */
+  excerpt?: string | null;
   author: string;
   author_role?: string | null;
   published_at: string;
@@ -63,6 +66,11 @@ export class ArticleService {
 
   getOne(id: number | string) {
     return this.http.get<ArticleItem>(`/api/articles/${id}`, { headers: this.authHeaders() });
+  }
+
+  /** Article complet SANS compter de vue — pour remplir le formulaire d'édition admin. */
+  getForEdit(id: number | string) {
+    return this.http.get<ArticleItem>(`/api/articles/${id}?count=0`, { headers: this.authHeaders() });
   }
 
   create(data: Partial<ArticleItem>) {

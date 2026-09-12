@@ -85,7 +85,32 @@ export const routes: Routes = [
     title: 'CGU — Headlines',
   },
   {
+    // Page dédiée « tous les articles », éventuellement filtrée par rubrique.
+    path: 'articles',
+    loadComponent: () =>
+      import('./pages/articles/articles.component').then((m) => m.ArticlesComponent),
+    title: 'Articles — Headlines',
+  },
+  {
+    path: 'articles/:sector',
+    loadComponent: () =>
+      import('./pages/articles/articles.component').then((m) => m.ArticlesComponent),
+    title: 'Articles — Headlines',
+  },
+  {
+    path: 'recherche',
+    loadComponent: () =>
+      import('./pages/search/search.component').then((m) => m.SearchComponent),
+    title: 'Recherche — Headlines',
+  },
+  {
     path: 'article/:id',
+    component: ArticleComponent,
+    title: 'Article — Headlines',
+  },
+  {
+    // Lien de partage « lisible » (le slug est cosmétique, seul :id est résolu).
+    path: 'article/:id/:slug',
     component: ArticleComponent,
     title: 'Article — Headlines',
   },

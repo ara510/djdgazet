@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ArticleService, ArticleItem } from '../../services/article.service';
 import { AuthModalService } from '../../services/auth-modal.service';
+import { slugify } from '../../utils/slug';
 
 @Component({
   selector: 'app-article',
@@ -99,12 +100,9 @@ export class ArticleComponent {
     return isNaN(d.getTime()) ? '' : d.toLocaleDateString(this.fr() ? 'fr-FR' : 'en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   }
 
-  /** Extrait en texte brut de la description HTML (pour les cartes « Sur le même secteur »). */
+  /** Extrait des cartes « Sur le même secteur » — la liste renvoie déjà un extrait en texte brut. */
   relatedExcerpt(r: ArticleItem): string {
-    if (!r.description) return '';
-    const div = document.createElement('div');
-    div.innerHTML = r.description;
-    return (div.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    return (r.excerpt || '').slice(0, 160);
   }
 
   toggleFavorite() {
@@ -126,7 +124,13 @@ export class ArticleComponent {
     });
   }
 
-  private shareUrl(): string { return window.location.href; }
+  /** URL « lisible » à partager (titre en slug) plutôt que le lien brut /article/62 — l'id
+   *  reste la seule clé résolue par le routeur, le slug n'est que cosmétique. */
+  private shareUrl(): string {
+    const a = this.backendArticle();
+    if (!a) return window.location.href;
+    return `${window.location.origin}/article/${a.id}/${slugify(a.title)}`;
+  }
   private shareTitle(): string { return this.backendArticle()?.title || 'Headlines'; }
   private openShare(url: string) { window.open(url, '_blank', 'noopener,noreferrer,width=640,height=560'); }
 
@@ -142,10 +146,15 @@ export class ArticleComponent {
   shareMessenger() {
     this.openShare('fb-messenger://share/?link=' + encodeURIComponent(this.shareUrl()));
   }
-  /** Instagram n'accepte pas de partage de lien par URL : on copie le lien et on ouvre Instagram. */
+  /** Instagram n'accepte pas de partage de lien par URL (aucun dialogue web officiel) : on copie
+   *  le lien et on laisse l'utilisateur ouvrir Instagram lui-même. Ne PAS ouvrir instagram.com en
+   *  parallèle : ça déplace le focus avant la fin de l'écriture presse-papiers (souvent asynchrone)
+   *  et fait échouer silencieusement la copie sur mobile — d'où l'impression que « ça ouvre juste
+   *  Instagram et c'est tout ». */
   shareInstagram() {
-    this.copyLink(this.fr() ? 'Lien copié — collez-le dans votre story ou message Instagram.' : 'Link copied — paste it into your Instagram story or message.');
-    this.openShare('https://www.instagram.com/');
+    this.copyLink(this.fr()
+      ? 'Lien copié — ouvrez Instagram et collez-le dans votre story ou message.'
+      : 'Link copied — open Instagram and paste it into your story or message.');
   }
 
   copyLink(msg?: string) {
