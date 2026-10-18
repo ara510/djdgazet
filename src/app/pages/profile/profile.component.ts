@@ -6,7 +6,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { I18nService } from '../../services/i18n.service';
 import { ToastService } from '../../services/toast.service';
-import { isoToFr, frToIso } from '../../utils/date-fr';
+import { isoToFr, parseBirthDate, birthDateMessage, birthDateEcho } from '../../utils/date-fr';
 
 /** État du quota découverte (plan Générale) renvoyé par GET /api/veille/quota. */
 interface QuotaInfo {
@@ -95,6 +95,9 @@ export class ProfileComponent {
   /** Avatar affiché : preview en édition, sinon celui du compte. */
   readonly avatarSrc = computed(() => this.editing() ? this.fAvatar() : (this.auth.currentUser()?.avatar ?? null));
 
+  /** Date de naissance telle qu'elle est comprise (renvoi affiché sous le champ). */
+  dobEcho(): string { return birthDateEcho(this.fDate(), this.fr()); }
+
   formatDate(value?: string | null): string {
     if (!value) return '—';
     const d = new Date(value);
@@ -174,9 +177,14 @@ export class ProfileComponent {
     if (this.saving()) return;
     this.error.set('');
 
-    const dobIso = frToIso(this.fDate());
+    const dob = parseBirthDate(this.fDate());
+    const dobIso = dob.iso;
     if (!this.fPrenoms().trim() || !this.fNom().trim() || !this.fEmail().trim() || !this.fUsername().trim() || !dobIso) {
       this.error.set(this.fr() ? 'Nom, prénoms, email, identifiant et date (jj/mm/aaaa) sont requis.' : 'Name, email, username and date (dd/mm/yyyy) are required.');
+      return;
+    }
+    if (dob.issue) {
+      this.error.set(birthDateMessage(dob.issue, this.fr()));
       return;
     }
     if (!/^[a-zA-Z0-9]+$/.test(this.fUsername().trim())) {

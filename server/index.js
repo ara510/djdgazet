@@ -98,6 +98,30 @@ function cleanStr(v, max = 500) {
 }
 // Valide une adresse email (format + longueur RFC).
 function isEmail(v) { return typeof v === 'string' && v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+// ─── Date de naissance plausible ───────────────────────────────────────────────
+// Des comptes existants portaient des naissances en 2073/2081/2096 : une année à 2 chiffres
+// (« 21/09/96 ») était préfixée « 20 » côté client. Corrigé là-bas, mais la règle est aussi
+// appliquée ici : le client ne fait jamais foi, et une date absurde ne doit pas entrer en base.
+const MIN_AGE = 16;   // âge retenu pour comprendre l'actualité et gérer un abonnement
+const MAX_AGE = 110;  // au-delà, c'est une faute de frappe
+/** Renvoie un message d'erreur, ou `null` si la date est celle d'une personne réelle. */
+function birthDateError(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim().slice(0, 10));
+  if (!m) return 'Date de naissance invalide (jj/mm/aaaa).';
+  const [y, mo, d] = [+m[1], +m[2], +m[3]];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d)
+    return 'Date de naissance invalide : ce jour n\'existe pas.';
+  const now = new Date();
+  let age = now.getUTCFullYear() - y;
+  const passed = now.getUTCMonth() + 1 > mo || (now.getUTCMonth() + 1 === mo && now.getUTCDate() >= d);
+  if (!passed) age -= 1;
+  if (age < 0)       return 'Cette date est dans le futur. Vérifiez l\'année de naissance (ex. 1996 et non 2096).';
+  if (age < MIN_AGE) return `Vous devez avoir au moins ${MIN_AGE} ans pour créer un compte.`;
+  if (age > MAX_AGE) return 'Année de naissance improbable : vérifiez votre saisie.';
+  return null;
+}
 // Échappe le HTML — pour tout texte utilisateur inséré dans du HTML (emails notamment).
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;' }[c]));
@@ -222,7 +246,7 @@ db.query(`
 const BOOT_ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || '@dujardin-delacour.com').toLowerCase();
 // Admins permanents par identifiant (comptes hors domaine) : re-promus à chaque boot ET
 // jamais rétrogradés par la synchro ci-dessous. Ajouter/retirer un identifiant ici.
-const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8', 'ntso'];
+const BOOT_ADMIN_USERNAMES = ['joshuapatrick', 'tojor8', 'ntso', 'tokydmc'];
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(email) LIKE $1 AND is_admin = FALSE`, ['%' + BOOT_ADMIN_DOMAIN]).catch(() => {});
 db.query(`UPDATE users SET is_admin = TRUE  WHERE LOWER(username) = ANY($1) AND is_admin = FALSE`, [BOOT_ADMIN_USERNAMES]).catch(() => {});
 db.query(`UPDATE users SET is_admin = FALSE WHERE LOWER(email) NOT LIKE $1 AND LOWER(username) <> ALL($2) AND admin_locked = FALSE AND is_admin = TRUE`, ['%' + BOOT_ADMIN_DOMAIN, BOOT_ADMIN_USERNAMES]).catch(() => {});
@@ -416,6 +440,7 @@ db.query(`CREATE INDEX IF NOT EXISTS idx_articles_sector ON articles(sector)`).c
 db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS creation_date DATE`).catch(() => {}); // date de rédaction (≠ date d'ajout/publication)
 db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS images TEXT[]`).catch(() => {});      // photos de l'article (la 1re = photo principale)
 db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS image_position VARCHAR(20)`).catch(() => {}); // cadrage de la photo principale (object-position, ex. "50% 30%")
+db.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS image_captions TEXT[]`).catch(() => {}); // légende de chaque photo, alignée sur `images` (1 photo = 1 légende)
 // Favoris d'articles (enregistrés par les utilisateurs).
 db.query(`
   CREATE TABLE IF NOT EXISTS article_favorites (
@@ -514,6 +539,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
   if (!isEmail(email))
     return res.status(400).json({ error: 'Adresse email invalide.' });
+
+  const dobError = birthDateError(date_naissance);
+  if (dobError) return res.status(400).json({ error: dobError });
 
   if (typeof password !== 'string' || password.length > 200)
     return res.status(400).json({ error: 'Mot de passe invalide.' });
@@ -625,6 +653,9 @@ app.patch('/api/auth/me', requireAuth, async (req, res) => {
 
   if (!isEmail(email))
     return res.status(400).json({ error: 'Adresse email invalide.' });
+
+  const dobError = birthDateError(date_naissance);
+  if (dobError) return res.status(400).json({ error: dobError });
 
   if (!/^[a-zA-Z0-9]+$/.test(username) || username.length < 3)
     return res.status(400).json({ error: 'Le nom d\'utilisateur doit contenir 3 à 30 lettres ou chiffres.' });
@@ -932,13 +963,16 @@ app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
       db.query(
         `SELECT id, nom, prenoms, username, email, date_naissance, telephone, pays, ville, genre,
                 notif_email, plan, is_admin, email_verified, disabled, created_at, deleted_at
-         FROM users ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`,
+         FROM users ORDER BY is_admin DESC, created_at DESC, id DESC LIMIT $1 OFFSET $2`,
         [limit, offset]
       ),
-      db.query(`SELECT COUNT(*)::int AS total FROM users`),
+      db.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_admin)::int AS admins FROM users`),
     ]);
     const total = count.rows[0].total;
-    res.json({ users: list.rows, total, offset, limit, hasMore: offset + list.rows.length < total });
+    // `admins` : total réel des administrateurs. Le tri place les admins AVANT les autres comptes,
+    // donc le groupe « Administrateurs » de l'écran de gestion est complet dès la 1re page —
+    // le défilement infini n'ajoute ensuite que des utilisateurs normaux.
+    res.json({ users: list.rows, total, admins: count.rows[0].admins, offset, limit, hasMore: offset + list.rows.length < total });
   } catch (err) {
     console.error('Users list error:', err);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1706,9 +1740,13 @@ app.get('/api/veille', requireAuth, async (req, res) => {
     const feedMode = !isAdmin && userLevel >= 1;
     const excerptSql = feedMode ? 'vi.excerpt' : 'left(vi.excerpt, 300) AS excerpt';
     const longFields = feedMode ? 'vi.trends, vi.signals,' : '';
+    // Même en mode compact (sans le texte des signaux), les cartes doivent pouvoir afficher
+    // l'icône « signaux d'alerte » du bulletin hebdo : on envoie un simple booléen.
+    const signalFlag = `(vi.signals IS NOT NULL AND btrim(vi.signals) <> '') AS has_signals`;
     const { rows } = await db.query(
       `SELECT vi.id, vi.title, vi.source, vi.sources, vi.source_type, vi.source_types, vi.social_network, vi.social_networks, vi.sector, vi.sectors, vi.tone, vi.url, vi.urls,
               ${excerptSql}, vi.image, vi.author, ${longFields}
+              ${signalFlag},
               vi.category, vi.tags, vi.media_dediee, vi.justify,
               COALESCE(array_length(vi.images, 1), 0) AS images_count,
               (vi.video IS NOT NULL) AS has_video,
@@ -2527,7 +2565,16 @@ app.delete('/api/alerts/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── Articles (rédigés par les admins) ──────────────────────────────────────────
-const ARTICLE_FIELDS = `id, sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, views, created_at`;
+const ARTICLE_FIELDS = `id, sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, image_captions, views, created_at`;
+
+// Légendes de la galerie : exactement une entrée par photo, dans le même ordre que `images`
+// (chaîne vide = photo sans légende). Recalé côté serveur pour que les deux tableaux ne
+// puissent jamais se désynchroniser, même si le client envoie n'importe quoi.
+function normalizeCaptions(captions, imgs) {
+  if (!imgs) return null;
+  const src = Array.isArray(captions) ? captions : [];
+  return imgs.map((_, i) => cleanStr(src[i], 300));
+}
 
 // Projection « liste » : tout SAUF le contenu intégral (`description` HTML, parfois 68 Ko pour un
 // seul article, et le tableau `images`). À la place, un extrait en texte brut tronqué côté serveur
@@ -2538,19 +2585,20 @@ const ARTICLE_LIST_FIELDS = `id, sector, title, author, author_role, published_a
 
 // POST /api/articles (admin) — créer
 app.post('/api/articles', requireAuth, requireAdmin, async (req, res) => {
-  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images } = req.body;
+  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, image_captions } = req.body;
   if (!sector || !VEILLE_SECTORS.includes(sector)) return res.status(400).json({ error: 'Secteur invalide.' });
   if (!title?.trim())  return res.status(400).json({ error: 'Titre requis.' });
   if (!author?.trim()) return res.status(400).json({ error: 'Auteur requis.' });
   if (!published_at)   return res.status(400).json({ error: "Date d'ajout requise." });
   const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u) : null;
+  const caps = normalizeCaptions(image_captions, imgs);
   const pos  = typeof image_position === 'string' ? image_position.slice(0, 20) : null;
   try {
     const { rows } = await db.query(
-      `INSERT INTO articles (sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ${ARTICLE_FIELDS}`,
+      `INSERT INTO articles (sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, image_captions, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ${ARTICLE_FIELDS}`,
       [sector, title.trim(), sanitizeRichHtml(description), author.trim(), author_role ?? null, published_at, creation_date || null,
-       read_minutes ? parseInt(read_minutes, 10) : null, (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.user.id]
+       read_minutes ? parseInt(read_minutes, 10) : null, (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, caps, req.user.id]
     );
     logActivity(req, 'article.create', title.trim());
     res.status(201).json(rows[0]);
@@ -2717,19 +2765,20 @@ app.get('/api/articles/:id', optionalAuth, async (req, res) => {
 
 // PATCH /api/articles/:id (admin)
 app.patch('/api/articles/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images } = req.body;
+  const { sector, title, description, author, author_role, published_at, creation_date, read_minutes, image, image_alt, image_position, images, image_captions } = req.body;
   if (sector && !VEILLE_SECTORS.includes(sector)) return res.status(400).json({ error: 'Secteur invalide.' });
   const imgs = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u) : null;
+  const caps = normalizeCaptions(image_captions, imgs);
   const pos  = typeof image_position === 'string' ? image_position.slice(0, 20) : null;
   try {
     const { rows } = await db.query(
       `UPDATE articles SET
          sector=COALESCE($1,sector), title=COALESCE($2,title), description=$3, author=COALESCE($4,author),
-         author_role=$5, published_at=COALESCE($6,published_at), creation_date=$7, read_minutes=$8, image=$9, image_alt=$10, image_position=$11, images=$12
+         author_role=$5, published_at=COALESCE($6,published_at), creation_date=$7, read_minutes=$8, image=$9, image_alt=$10, image_position=$11, images=$12, image_captions=$14
        WHERE id=$13 AND deleted_at IS NULL RETURNING ${ARTICLE_FIELDS}`,
       [sector ?? null, title?.trim() ?? null, sanitizeRichHtml(description), author?.trim() ?? null, author_role ?? null,
        published_at ?? null, creation_date || null, read_minutes ? parseInt(read_minutes, 10) : null,
-       (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.params.id]);
+       (imgs && imgs[0]) || image || null, image_alt ?? null, pos, imgs, req.params.id, caps]);
     if (!rows.length) return res.status(404).json({ error: 'Article introuvable.' });
     logActivity(req, 'article.update', rows[0].title);
     res.json(rows[0]);
@@ -2960,4 +3009,59 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => console.log(`✅ Serveur ${BRAND_NAME} démarré sur http://localhost:${PORT}`));
+// ─── Remise à zéro des dates de naissance absurdes (comptes déjà créés) ─────────
+// Trois comptes en base étaient « nés » en 2073, 2081 et 2096 : on vide le champ et on
+// prévient la personne (message dans le chat support + email si elle est vérifiée) pour
+// qu'elle le corrige. Idempotent : une fois le champ à NULL le compte n'est plus repris,
+// donc aucun message en double aux redémarrages suivants.
+async function resetImplausibleBirthDates() {
+  try {
+    // La colonne est NOT NULL en base historique alors que le schéma la déclare facultative :
+    // il faut pouvoir la vider le temps que la personne la corrige (l'inscription et la mise à
+    // jour du profil, elles, l'exigent toujours).
+    await db.query('ALTER TABLE users ALTER COLUMN date_naissance DROP NOT NULL').catch(() => {});
+    const { rows } = await db.query(
+      `UPDATE users SET date_naissance = NULL
+       WHERE deleted_at IS NULL AND date_naissance IS NOT NULL
+         AND (date_naissance > CURRENT_DATE - ($1 || ' years')::interval
+           OR date_naissance < CURRENT_DATE - ($2 || ' years')::interval)
+       RETURNING id, prenoms, email, username, email_verified`,
+      [MIN_AGE, MAX_AGE]
+    );
+    if (!rows.length) return;
+    console.log(`ℹ️  Date de naissance remise à zéro pour ${rows.length} compte(s) : ${rows.map(u => u.username).join(', ')}`);
+    for (const u of rows) {
+      pushStaffMessage(u.id,
+        `Bonjour ${u.prenoms || u.username}, votre date de naissance n'était pas valide (année dans le futur) `
+        + `et a été effacée. Merci de la renseigner à nouveau dans « Mon profil ».`
+      ).catch(() => {});
+      if (u.email_verified && isEmail(u.email)) {
+        resend.emails.send({
+          from:    SENDER_FROM,
+          to:      u.email,
+          subject: `[${BRAND_NAME}] Merci de corriger votre date de naissance`,
+          html: emailLayout(`
+            <h2 style="font-family:Georgia,serif;font-size:1.1rem;font-weight:400;color:#1C2637;margin:0 0 6px;">Votre date de naissance</h2>
+            <p style="font-size:0.9rem;color:#1C2637;line-height:1.7;margin:0 0 16px;">Bonjour ${escapeHtml(u.prenoms || u.username)},</p>
+            <p style="font-size:0.9rem;color:#1C2637;line-height:1.7;margin:0 0 16px;">
+              La date de naissance enregistrée sur votre compte était dans le futur — probablement une
+              année saisie à deux chiffres (par exemple « 96 » devenu 2096). Nous l'avons effacée.
+            </p>
+            <p style="font-size:0.9rem;color:#1C2637;line-height:1.7;margin:0 0 24px;">
+              Merci de la renseigner à nouveau depuis <strong>Mon profil</strong>, en écrivant l'année en entier.
+            </p>
+            <p style="margin:0;"><a href="${APP_URL.replace(/\/+$/, '')}/profil" style="display:inline-block;background:#1E5FD4;color:#fff;text-decoration:none;padding:11px 22px;border-radius:4px;font-family:Inter,Arial,sans-serif;font-size:0.85rem;">Corriger ma date de naissance</a></p>
+          `),
+        }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('Reset dates de naissance error:', err);
+  }
+}
+
+app.listen(PORT, () => {
+  console.log(`✅ Serveur ${BRAND_NAME} démarré sur http://localhost:${PORT}`);
+  // Après le démarrage : les tables (chat compris) sont prêtes.
+  setTimeout(resetImplausibleBirthDates, 2000);
+});

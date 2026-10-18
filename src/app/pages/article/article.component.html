@@ -19,11 +19,11 @@
 
     @if (galleryImages().length) {
       <figure class="container-news max-w-5xl">
-        <img [src]="galleryImages()[0]" [alt]="ba.image_alt || ba.title" (click)="openLightbox(0)"
+        <img [src]="galleryImages()[0]" [alt]="galleryCaptions()[0] || ba.title" (click)="openLightbox(0)"
              class="w-full rounded-sm object-cover max-h-[28rem] cursor-zoom-in"
              [style.object-position]="ba.image_position || '50% 50%'" />
-        @if (ba.image_alt) {
-          <figcaption class="text-xs text-silver-500 mt-2 italic">{{ ba.image_alt }}</figcaption>
+        @if (galleryCaptions()[0]) {
+          <figcaption class="text-xs text-silver-500 mt-2 italic">{{ galleryCaptions()[0] }}</figcaption>
         }
 
         <!-- Galerie : bouton sous la photo principale (pas de défilement auto), s'il y a plus d'une photo -->
@@ -39,8 +39,13 @@
           @if (showGallery()) {
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
               @for (img of galleryImages(); track img; let i = $index) {
-                <img [src]="img" alt="" (click)="openLightbox(i)" loading="lazy"
-                     class="w-full h-32 rounded-sm object-cover border border-silver-200 cursor-zoom-in hover:opacity-90 hover:border-gazety-red transition" />
+                <figure>
+                  <img [src]="img" [alt]="galleryCaptions()[i] || ''" (click)="openLightbox(i)" loading="lazy"
+                       class="w-full h-32 rounded-sm object-cover border border-silver-200 cursor-zoom-in hover:opacity-90 hover:border-gazety-red transition" />
+                  @if (galleryCaptions()[i]) {
+                    <figcaption class="text-[11px] text-silver-500 mt-1 italic leading-snug">{{ galleryCaptions()[i] }}</figcaption>
+                  }
+                </figure>
               }
             </div>
           }
@@ -155,8 +160,13 @@
   <!-- Visionneuse plein écran : photo en grand, fond flou, animation d'ouverture -->
   @if (lightbox() !== null) {
     <div class="fixed inset-0 z-[700] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" (click)="closeLightbox()">
-      <img [src]="galleryImages()[lightbox()!]" [alt]="ba.image_alt || ba.title" (click)="$event.stopPropagation()"
-           class="lb-zoom max-w-full max-h-[92vh] object-contain rounded-sm shadow-2xl" />
+      <figure class="lb-zoom max-w-full max-h-[92vh] flex flex-col items-center" (click)="$event.stopPropagation()">
+        <img [src]="galleryImages()[lightbox()!]" [alt]="galleryCaptions()[lightbox()!] || ba.title"
+             class="max-w-full max-h-[84vh] object-contain rounded-sm shadow-2xl" />
+        @if (galleryCaptions()[lightbox()!]) {
+          <figcaption class="mt-3 mb-8 max-w-2xl text-center text-xs sm:text-sm text-white/80 italic px-4">{{ galleryCaptions()[lightbox()!] }}</figcaption>
+        }
+      </figure>
 
       <button type="button" (click)="closeLightbox()" [attr.aria-label]="i18n.isFrench() ? 'Fermer' : 'Close'"
               class="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">

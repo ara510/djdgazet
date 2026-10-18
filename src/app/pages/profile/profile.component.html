@@ -176,6 +176,10 @@
             <input type="text" inputmode="numeric" placeholder="jj/mm/aaaa" maxlength="10"
                    [ngModel]="fDate()" (ngModelChange)="fDate.set($event)" name="date" required
                    class="w-full px-4 py-2.5 border border-silver-300 rounded-sm focus:outline-none focus:border-gazety-red text-sm" />
+            <!-- Renvoi de la date telle qu'elle est comprise : une erreur d'année se voit avant d'enregistrer. -->
+            @if (dobEcho()) {
+              <p class="mt-1 text-[11px] text-silver-500">{{ dobEcho() }}</p>
+            }
           </div>
           <div>
             <label class="block text-xs font-semibold text-gazety-dark mb-1.5">{{ fr() ? 'Genre' : 'Gender' }}</label>

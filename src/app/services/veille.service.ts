@@ -20,6 +20,9 @@ export interface VeilleItem {
   category?: 'daily' | 'weekly';
   trends?: string | null;     // bulletin hebdo : tendances de la semaine (facultatif)
   signals?: string | null;    // bulletin hebdo : signaux d'alerte (facultatif)
+  /** Drapeau envoyé par les LISTES allégées (le texte des signaux n'y est pas) : sert à afficher
+   *  l'icône d'alerte sur la carte sans transporter le contenu. */
+  has_signals?: boolean;
   media_dediee?: boolean;     // médias (photo/vidéo/lien) réservés à la Dédiée
   url?: string | null;
   urls?: string[] | null;     // liens multiples de la source (url = urls[0], legacy)

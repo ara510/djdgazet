@@ -55,6 +55,16 @@ export class ArticleComponent {
     return a.images?.length ? a.images : (a.image ? [a.image] : []);
   });
 
+  /** Légende de chaque photo, alignée sur `galleryImages()` — `image_alt` reste la légende de la
+   *  photo principale pour les articles publiés avant cette fonctionnalité. */
+  readonly galleryCaptions = computed<string[]>(() => {
+    const a = this.backendArticle();
+    const imgs = this.galleryImages();
+    if (!a) return [];
+    const caps = a.image_captions ?? [];
+    return imgs.map((_, i) => (caps[i] ?? (i === 0 ? (a.image_alt ?? '') : '')) || '');
+  });
+
   constructor() {
     // allowSignalWrites : l'effet réinitialise des signaux (showGallery/backendArticle) à chaque
     // changement d'id — interdit par défaut dans un effect Angular 18.

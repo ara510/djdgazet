@@ -127,74 +127,169 @@
       @if (admin.usersLoading()) {
         <app-loader />
       } @else {
-        <p class="users-count">{{ admin.users().length }} / {{ admin.usersTotal() }} {{ fr ? 'compte(s)' : 'account(s)' }}</p>
-        <div class="user-cards" (scroll)="onUsersScroll($event)">
-          @for (u of admin.users(); track u.id) {
-            <article class="ucard" [class.ucard--disabled]="u.disabled" [class.ucard--deleted]="u.deleted_at">
-              <header class="ucard__head">
-                <span class="ucard__avatar" [class.ucard__avatar--admin]="u.is_admin">{{ userInitials(u) }}</span>
-                <div class="ucard__id">
-                  <span class="ucard__name">{{ u.prenoms }} {{ u.nom }}</span>
-                  <span class="ucard__handle">&#64;{{ u.username }}</span>
-                </div>
-                <span class="ucard__badges">
-                  @if (u.is_admin) { <span class="ucard__chip ucard__chip--admin">{{ fr ? 'Admin' : 'Admin' }}</span> }
-                  @if (u.email_verified) {
-                    <span class="ucard__chip ucard__chip--ok">{{ fr ? 'Vérifié' : 'Verified' }}</span>
-                  } @else {
-                    <span class="ucard__chip ucard__chip--no">{{ fr ? 'Non vérifié' : 'Unverified' }}</span>
-                  }
-                  @if (u.disabled)   { <span class="ucard__chip ucard__chip--off">{{ fr ? 'Désactivé' : 'Disabled' }}</span> }
-                  @if (u.deleted_at) { <span class="ucard__chip ucard__chip--del">{{ fr ? 'Suppression' : 'Deletion' }}</span> }
-                </span>
-              </header>
+        <!-- Deux groupes distincts : on ne mélange plus les administrateurs et les comptes
+             utilisateurs. Le serveur trie les admins en tête, donc leur groupe est complet
+             dès le premier chargement ; le défilement infini n'allonge que le second. -->
+        <div class="user-scroll" (scroll)="onUsersScroll($event)">
+          <section class="user-group">
+            <h3 class="user-group__title">
+              <span class="user-group__dot user-group__dot--admin"></span>
+              {{ fr ? 'Administrateurs' : 'Administrators' }}
+              <span class="user-group__count">{{ admin.usersAdminsTotal() }}</span>
+            </h3>
+            @if (adminAccounts().length) {
+              <div class="user-cards">
+            @for (u of adminAccounts(); track u.id) {
+              <article class="ucard" [class.ucard--disabled]="u.disabled" [class.ucard--deleted]="u.deleted_at">
+                <header class="ucard__head">
+                  <span class="ucard__avatar" [class.ucard__avatar--admin]="u.is_admin">{{ userInitials(u) }}</span>
+                  <div class="ucard__id">
+                    <span class="ucard__name">{{ u.prenoms }} {{ u.nom }}</span>
+                    <span class="ucard__handle">&#64;{{ u.username }}</span>
+                  </div>
+                  <span class="ucard__badges">
+                    @if (u.is_admin) { <span class="ucard__chip ucard__chip--admin">{{ fr ? 'Admin' : 'Admin' }}</span> }
+                    @if (u.email_verified) {
+                      <span class="ucard__chip ucard__chip--ok">{{ fr ? 'Vérifié' : 'Verified' }}</span>
+                    } @else {
+                      <span class="ucard__chip ucard__chip--no">{{ fr ? 'Non vérifié' : 'Unverified' }}</span>
+                    }
+                    @if (u.disabled)   { <span class="ucard__chip ucard__chip--off">{{ fr ? 'Désactivé' : 'Disabled' }}</span> }
+                    @if (u.deleted_at) { <span class="ucard__chip ucard__chip--del">{{ fr ? 'Suppression' : 'Deletion' }}</span> }
+                  </span>
+                </header>
 
-              <dl class="ucard__grid">
-                <div class="ucard__field ucard__field--wide"><dt>{{ fr ? 'Email' : 'Email' }}</dt><dd>{{ u.email }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Téléphone' : 'Phone' }}</dt><dd>{{ u.telephone || '—' }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Ville' : 'City' }}</dt><dd>{{ u.ville || '—' }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Pays' : 'Country' }}</dt><dd>{{ u.pays || '—' }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Genre' : 'Gender' }}</dt><dd>{{ genreLabel(u.genre) }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Naissance' : 'Birth date' }}</dt><dd>{{ u.date_naissance ? (u.date_naissance | date:'dd/MM/yyyy') : '—' }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Abonnement' : 'Subscription' }}</dt><dd>{{ u.is_admin ? (fr ? 'Administrateur' : 'Administrator') : planLabel(u.plan) }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Notif. email' : 'Email notif.' }}</dt><dd>{{ u.notif_email ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No') }}</dd></div>
-                <div class="ucard__field"><dt>{{ fr ? 'Inscription' : 'Joined' }}</dt><dd>{{ u.created_at | date:'dd/MM/yyyy' }}</dd></div>
-              </dl>
+                <dl class="ucard__grid">
+                  <div class="ucard__field ucard__field--wide"><dt>{{ fr ? 'Email' : 'Email' }}</dt><dd>{{ u.email }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Téléphone' : 'Phone' }}</dt><dd>{{ u.telephone || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Ville' : 'City' }}</dt><dd>{{ u.ville || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Pays' : 'Country' }}</dt><dd>{{ u.pays || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Genre' : 'Gender' }}</dt><dd>{{ genreLabel(u.genre) }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Naissance' : 'Birth date' }}</dt><dd>{{ u.date_naissance ? (u.date_naissance | date:'dd/MM/yyyy') : '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Abonnement' : 'Subscription' }}</dt><dd>{{ u.is_admin ? (fr ? 'Administrateur' : 'Administrator') : planLabel(u.plan) }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Notif. email' : 'Email notif.' }}</dt><dd>{{ u.notif_email ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No') }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Inscription' : 'Joined' }}</dt><dd>{{ u.created_at | date:'dd/MM/yyyy' }}</dd></div>
+                </dl>
 
-              <footer class="ucard__foot">
-                <label class="ucard__admin-toggle" [class.ucard__admin-toggle--self]="u.id === auth.currentUser()?.id">
-                  <input type="checkbox" [checked]="u.is_admin"
-                         [disabled]="u.id === auth.currentUser()?.id"
-                         (change)="toggleAdmin(u, checkboxValue($event))" />
-                  <span>{{ fr ? 'Administrateur' : 'Administrator' }}</span>
-                </label>
+                <footer class="ucard__foot">
+                  <label class="ucard__admin-toggle" [class.ucard__admin-toggle--self]="u.id === auth.currentUser()?.id">
+                    <input type="checkbox" [checked]="u.is_admin"
+                           [disabled]="u.id === auth.currentUser()?.id"
+                           (change)="toggleAdmin(u, checkboxValue($event))" />
+                    <span>{{ fr ? 'Administrateur' : 'Administrator' }}</span>
+                  </label>
 
-                <div class="ucard__controls">
-                  @if (!u.is_admin) {
-                    <select class="user-row__select" [value]="u.plan" (change)="changeUserPlan(u, selectValue($event))" [attr.data-plan]="u.plan">
-                      @for (p of planValues; track p) { <option [value]="p">{{ planLabel(p) }}</option> }
-                    </select>
-                    <button class="user-row__toggle" [class.user-row__toggle--on]="u.disabled" type="button" (click)="toggleDisabled(u)">
-                      {{ u.disabled ? (fr ? 'Réactiver' : 'Enable') : (fr ? 'Désactiver' : 'Disable') }}
+                  <div class="ucard__controls">
+                    @if (!u.is_admin) {
+                      <select class="user-row__select" [value]="u.plan" (change)="changeUserPlan(u, selectValue($event))" [attr.data-plan]="u.plan">
+                        @for (p of planValues; track p) { <option [value]="p">{{ planLabel(p) }}</option> }
+                      </select>
+                      <button class="user-row__toggle" [class.user-row__toggle--on]="u.disabled" type="button" (click)="toggleDisabled(u)">
+                        {{ u.disabled ? (fr ? 'Réactiver' : 'Enable') : (fr ? 'Désactiver' : 'Disable') }}
+                      </button>
+                    }
+                    <button class="ucard__act ucard__act--msg" type="button" (click)="messageUser(u)">
+                      {{ fr ? 'Message' : 'Message' }}
                     </button>
-                  }
-                  <button class="ucard__act ucard__act--msg" type="button" (click)="messageUser(u)">
-                    {{ fr ? 'Message' : 'Message' }}
-                  </button>
-                  @if (isSuperAdmin) {
-                    <button class="ucard__act ucard__act--reset" type="button" (click)="sendResetLink(u)">
-                      {{ fr ? 'Lien de reset' : 'Reset link' }}
+                    @if (isSuperAdmin) {
+                      <button class="ucard__act ucard__act--reset" type="button" (click)="sendResetLink(u)">
+                        {{ fr ? 'Lien de reset' : 'Reset link' }}
+                      </button>
+                    }
+                    @if (u.id !== auth.currentUser()?.id) {
+                      <button class="ucard__act ucard__act--del" type="button" (click)="deleteUser(u)">
+                        {{ fr ? 'Supprimer' : 'Delete' }}
+                      </button>
+                    }
+                  </div>
+                </footer>
+              </article>
+            }
+              </div>
+            } @else {
+              <p class="user-group__empty">{{ fr ? 'Aucun administrateur.' : 'No administrators.' }}</p>
+            }
+          </section>
+
+          <section class="user-group">
+            <h3 class="user-group__title">
+              <span class="user-group__dot"></span>
+              {{ fr ? 'Utilisateurs' : 'Users' }}
+              <span class="user-group__count">{{ normalAccounts().length }} / {{ normalTotal() }}</span>
+            </h3>
+            @if (normalAccounts().length) {
+              <div class="user-cards">
+            @for (u of normalAccounts(); track u.id) {
+              <article class="ucard" [class.ucard--disabled]="u.disabled" [class.ucard--deleted]="u.deleted_at">
+                <header class="ucard__head">
+                  <span class="ucard__avatar" [class.ucard__avatar--admin]="u.is_admin">{{ userInitials(u) }}</span>
+                  <div class="ucard__id">
+                    <span class="ucard__name">{{ u.prenoms }} {{ u.nom }}</span>
+                    <span class="ucard__handle">&#64;{{ u.username }}</span>
+                  </div>
+                  <span class="ucard__badges">
+                    @if (u.is_admin) { <span class="ucard__chip ucard__chip--admin">{{ fr ? 'Admin' : 'Admin' }}</span> }
+                    @if (u.email_verified) {
+                      <span class="ucard__chip ucard__chip--ok">{{ fr ? 'Vérifié' : 'Verified' }}</span>
+                    } @else {
+                      <span class="ucard__chip ucard__chip--no">{{ fr ? 'Non vérifié' : 'Unverified' }}</span>
+                    }
+                    @if (u.disabled)   { <span class="ucard__chip ucard__chip--off">{{ fr ? 'Désactivé' : 'Disabled' }}</span> }
+                    @if (u.deleted_at) { <span class="ucard__chip ucard__chip--del">{{ fr ? 'Suppression' : 'Deletion' }}</span> }
+                  </span>
+                </header>
+
+                <dl class="ucard__grid">
+                  <div class="ucard__field ucard__field--wide"><dt>{{ fr ? 'Email' : 'Email' }}</dt><dd>{{ u.email }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Téléphone' : 'Phone' }}</dt><dd>{{ u.telephone || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Ville' : 'City' }}</dt><dd>{{ u.ville || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Pays' : 'Country' }}</dt><dd>{{ u.pays || '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Genre' : 'Gender' }}</dt><dd>{{ genreLabel(u.genre) }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Naissance' : 'Birth date' }}</dt><dd>{{ u.date_naissance ? (u.date_naissance | date:'dd/MM/yyyy') : '—' }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Abonnement' : 'Subscription' }}</dt><dd>{{ u.is_admin ? (fr ? 'Administrateur' : 'Administrator') : planLabel(u.plan) }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Notif. email' : 'Email notif.' }}</dt><dd>{{ u.notif_email ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No') }}</dd></div>
+                  <div class="ucard__field"><dt>{{ fr ? 'Inscription' : 'Joined' }}</dt><dd>{{ u.created_at | date:'dd/MM/yyyy' }}</dd></div>
+                </dl>
+
+                <footer class="ucard__foot">
+                  <label class="ucard__admin-toggle" [class.ucard__admin-toggle--self]="u.id === auth.currentUser()?.id">
+                    <input type="checkbox" [checked]="u.is_admin"
+                           [disabled]="u.id === auth.currentUser()?.id"
+                           (change)="toggleAdmin(u, checkboxValue($event))" />
+                    <span>{{ fr ? 'Administrateur' : 'Administrator' }}</span>
+                  </label>
+
+                  <div class="ucard__controls">
+                    @if (!u.is_admin) {
+                      <select class="user-row__select" [value]="u.plan" (change)="changeUserPlan(u, selectValue($event))" [attr.data-plan]="u.plan">
+                        @for (p of planValues; track p) { <option [value]="p">{{ planLabel(p) }}</option> }
+                      </select>
+                      <button class="user-row__toggle" [class.user-row__toggle--on]="u.disabled" type="button" (click)="toggleDisabled(u)">
+                        {{ u.disabled ? (fr ? 'Réactiver' : 'Enable') : (fr ? 'Désactiver' : 'Disable') }}
+                      </button>
+                    }
+                    <button class="ucard__act ucard__act--msg" type="button" (click)="messageUser(u)">
+                      {{ fr ? 'Message' : 'Message' }}
                     </button>
-                  }
-                  @if (u.id !== auth.currentUser()?.id) {
-                    <button class="ucard__act ucard__act--del" type="button" (click)="deleteUser(u)">
-                      {{ fr ? 'Supprimer' : 'Delete' }}
-                    </button>
-                  }
-                </div>
-              </footer>
-            </article>
-          }
+                    @if (isSuperAdmin) {
+                      <button class="ucard__act ucard__act--reset" type="button" (click)="sendResetLink(u)">
+                        {{ fr ? 'Lien de reset' : 'Reset link' }}
+                      </button>
+                    }
+                    @if (u.id !== auth.currentUser()?.id) {
+                      <button class="ucard__act ucard__act--del" type="button" (click)="deleteUser(u)">
+                        {{ fr ? 'Supprimer' : 'Delete' }}
+                      </button>
+                    }
+                  </div>
+                </footer>
+              </article>
+            }
+              </div>
+            } @else {
+              <p class="user-group__empty">{{ fr ? 'Aucun compte utilisateur.' : 'No user accounts.' }}</p>
+            }
+          </section>
 
           @if (admin.usersLoadingMore()) {
             <app-loader />

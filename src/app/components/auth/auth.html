@@ -280,6 +280,10 @@
           <label class="auth-form__label">{{ lang.t('auth.signup.dob') }}</label>
           <input class="auth-form__input" type="text" inputmode="numeric" placeholder="jj/mm/aaaa" maxlength="10"
                  name="date_naissance" [(ngModel)]="signup.date_naissance" required />
+          <!-- Renvoi de la date telle qu'elle est comprise : une erreur d'année se voit avant d'envoyer. -->
+          @if (dobEcho()) {
+            <p class="auth-form__echo">{{ dobEcho() }}</p>
+          }
         </div>
 
         <div class="auth-form__field">

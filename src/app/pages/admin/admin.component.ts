@@ -33,6 +33,14 @@ export class AdminComponent implements OnDestroy {
   // Onglet actif de l'espace Administration.
   tab = signal<AdminTab>('stats');
 
+  // ── Gestion des comptes : deux groupes distincts ───────────────────────────
+  // Le serveur trie les admins en tête, donc le groupe « Administrateurs » est complet
+  // dès la première page ; le défilement infini n'allonge que la liste des utilisateurs.
+  readonly adminAccounts  = computed(() => this.admin.users().filter(u => u.is_admin));
+  readonly normalAccounts = computed(() => this.admin.users().filter(u => !u.is_admin));
+  /** Total des comptes non-admin (pour le compteur « chargés / total »). */
+  readonly normalTotal = computed(() => Math.max(0, this.admin.usersTotal() - this.admin.usersAdminsTotal()));
+
   // ── Messagerie (chat support) ──────────────────────────────────────────────
   conversations = signal<ChatConversation[]>([]);
   convLoading   = signal(false);
@@ -169,6 +177,7 @@ export class AdminComponent implements OnDestroy {
     });
     if (!ok) { this.admin.users.update(l => [...l]); return; } // resync la case sur l'ancienne valeur
     this.admin.users.update(l => l.map(u => u.id === user.id ? { ...u, is_admin: next } : u));
+    this.admin.usersAdminsTotal.update(n => Math.max(0, n + (next ? 1 : -1)));
     this.admin.setUserAdmin(user.id, next).subscribe({
       next: () => this.toast.show(
         next ? (this.fr ? `@${user.username} est désormais administrateur.` : `@${user.username} is now an admin.`)
@@ -177,6 +186,7 @@ export class AdminComponent implements OnDestroy {
       ),
       error: (err) => {
         this.admin.users.update(l => l.map(u => u.id === user.id ? { ...u, is_admin: !next } : u));
+        this.admin.usersAdminsTotal.update(n => Math.max(0, n + (next ? -1 : 1)));
         this.toast.show(err.error?.error || 'Erreur.', 'error');
       },
     });
@@ -200,6 +210,7 @@ export class AdminComponent implements OnDestroy {
     this.admin.deleteUser(user.id).subscribe({
       next: () => {
         this.admin.removeUserLocal(user.id);
+        if (user.is_admin) this.admin.usersAdminsTotal.update(n => Math.max(0, n - 1));
         this.toast.show(this.fr ? `@${user.username} supprimé.` : `@${user.username} deleted.`, 'success');
       },
       error: (err) => this.toast.show(err.error?.error || 'Erreur.', 'error'),

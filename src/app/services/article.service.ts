@@ -19,6 +19,8 @@ export interface ArticleItem {
   image_alt?: string | null;
   image_position?: string | null; // cadrage object-position de la photo principale (ex. "50% 30%")
   images?: string[] | null;
+  /** Légende de chaque photo, alignée sur `images` (1 photo = 1 légende, '' si vide). */
+  image_captions?: string[] | null;
   views: number;
   favorite?: boolean;
   locked?: boolean;

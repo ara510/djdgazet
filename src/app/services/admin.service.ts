@@ -65,6 +65,8 @@ export interface AdminUser {
 export interface UsersPage {
   users: AdminUser[];
   total: number;
+  /** Nombre total d'administrateurs (les admins sont triés en tête par le serveur). */
+  admins: number;
   offset: number;
   limit: number;
   hasMore: boolean;
@@ -91,6 +93,7 @@ export class AdminService {
   readonly usersLoading      = signal(false);   // chargement de la 1re page
   readonly usersLoadingMore  = signal(false);   // chargement d'une page suivante
   readonly usersTotal        = signal(0);
+  readonly usersAdminsTotal  = signal(0);
   readonly usersHasMore      = signal(false);
   private  readonly USERS_PAGE = 20;
 
@@ -161,6 +164,7 @@ export class AdminService {
       next: p => {
         this.users.set(p.users);
         this.usersTotal.set(p.total);
+        this.usersAdminsTotal.set(p.admins ?? 0);
         this.usersHasMore.set(p.hasMore);
         this.usersLoading.set(false);
       },
@@ -177,6 +181,7 @@ export class AdminService {
       next: p => {
         this.users.update(list => [...list, ...p.users]);
         this.usersTotal.set(p.total);
+        this.usersAdminsTotal.set(p.admins ?? 0);
         this.usersHasMore.set(p.hasMore);
         this.usersLoadingMore.set(false);
       },

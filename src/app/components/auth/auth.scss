@@ -309,6 +309,14 @@
     &[type="date"] { color-scheme: light; }
   }
 
+  // Renvoi sous le champ date de naissance : « Compris : 21 septembre 1996 — 30 ans ».
+  &__echo {
+    margin: 0.3rem 0 0;
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    color: var(--color-ink-muted);
+  }
+
   &__forgot {
     background: none;
     border: none;

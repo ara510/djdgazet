@@ -53,8 +53,9 @@ export class ArticleAdminComponent {
   readonly fCreationDate = signal('');
   readonly fReadMinutes = signal<number | null>(null);
   readonly fImages = signal<string[]>([]);
+  /** Une légende par photo, même index que `fImages` ('' = sans légende). */
+  readonly fCaptions = signal<string[]>([]);
   readonly fImageUrl = signal('');
-  readonly fImageAlt = signal('');
   readonly fImagePosition = signal('50% 50%'); // cadrage (object-position) de la photo principale
 
   constructor() {
@@ -107,7 +108,7 @@ export class ArticleAdminComponent {
     this.editingId.set(null);
     this.fSector.set('politique'); this.fTitle.set(''); this.fDescription.set('');
     this.fAuthor.set(''); this.fAuthorRole.set(''); this.fDate.set(isoToFr(new Date().toISOString().slice(0, 10)));
-    this.fCreationDate.set(''); this.fReadMinutes.set(null); this.fImages.set([]); this.fImageUrl.set(''); this.fImageAlt.set('');
+    this.fCreationDate.set(''); this.fReadMinutes.set(null); this.fImages.set([]); this.fCaptions.set([]); this.fImageUrl.set('');
     this.fImagePosition.set('50% 50%');
     this.formOpen.set(true);
   }
@@ -128,8 +129,12 @@ export class ArticleAdminComponent {
     this.fAuthor.set(a.author); this.fAuthorRole.set(a.author_role ?? ''); this.fDate.set(isoToFr(a.published_at));
     this.fCreationDate.set(isoToFr(a.creation_date));
     this.fReadMinutes.set(a.read_minutes ?? null);
-    this.fImages.set(a.images?.length ? [...a.images] : (a.image ? [a.image] : []));
-    this.fImageUrl.set(''); this.fImageAlt.set(a.image_alt ?? '');
+    const imgs = a.images?.length ? [...a.images] : (a.image ? [a.image] : []);
+    this.fImages.set(imgs);
+    // Articles d'avant la galerie légendée : `image_alt` servait de légende à la photo principale.
+    const caps = a.image_captions ?? [];
+    this.fCaptions.set(imgs.map((_, i) => caps[i] ?? (i === 0 ? (a.image_alt ?? '') : '')));
+    this.fImageUrl.set('');
     this.fImagePosition.set(a.image_position || '50% 50%');
     this.formOpen.set(true);
   }
@@ -160,7 +165,12 @@ export class ArticleAdminComponent {
     for (const f of files) fd.append('files', f);
     this.uploading.set(true);
     this.http.post<{ urls: string[] }>('/api/upload', fd, { headers: { Authorization: `Bearer ${this.auth.token()}` } }).subscribe({
-      next: r => { this.fImages.update(list => [...list, ...(r.urls ?? [])]); this.uploading.set(false); input.value = ''; },
+      next: r => {
+        const urls = r.urls ?? [];
+        this.fImages.update(list => [...list, ...urls]);
+        this.fCaptions.update(list => [...list, ...urls.map(() => '')]);
+        this.uploading.set(false); input.value = '';
+      },
       error: () => { this.uploading.set(false); this.toast.show(this.fr() ? "Échec de l'envoi de l'image." : 'Image upload failed.', 'error'); },
     });
   }
@@ -170,11 +180,23 @@ export class ArticleAdminComponent {
     const url = this.fImageUrl().trim();
     if (!url) return;
     this.fImages.update(list => [...list, url]);
+    this.fCaptions.update(list => [...list, '']);
     this.fImageUrl.set('');
   }
 
   removeImage(i: number) {
     this.fImages.update(list => list.filter((_, idx) => idx !== i));
+    this.fCaptions.update(list => list.filter((_, idx) => idx !== i));
+  }
+
+  /** Légende de la photo `i` (les deux tableaux restent alignés). */
+  setCaption(i: number, text: string) {
+    this.fCaptions.update(list => {
+      const next = [...list];
+      while (next.length < this.fImages().length) next.push('');
+      next[i] = text;
+      return next;
+    });
   }
 
   save() {
@@ -200,7 +222,10 @@ export class ArticleAdminComponent {
       read_minutes: this.fReadMinutes() || null,
       image: this.fImages()[0] || null,
       images: this.fImages(),
-      image_alt: this.fImageAlt().trim() || null,
+      image_captions: this.fImages().map((_, i) => (this.fCaptions()[i] ?? '').trim()),
+      // `image_alt` = légende de la photo principale : sert d'alternative textuelle sur les cartes
+      // et d'og:image:alt au partage.
+      image_alt: (this.fCaptions()[0] ?? '').trim() || null,
       image_position: this.fImages().length ? this.fImagePosition() : null,
     };
     this.saving.set(true);

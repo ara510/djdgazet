@@ -7,7 +7,7 @@ import { ToastService } from '../../services/toast.service';
 import { TranslationService } from '../../services/translation.service';
 import { PrivacyService } from '../../services/privacy.service';
 import lottie, { AnimationItem } from 'lottie-web';
-import { frToIso } from '../../utils/date-fr';
+import { parseBirthDate, birthDateMessage, birthDateEcho } from '../../utils/date-fr';
 
 type Tab = 'login' | 'signup';
 
@@ -66,6 +66,9 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
     nom: '', prenoms: '', date_naissance: '', email: '',
     username: '', password: '', passwordConfirm: '', acceptTerms: false,
   };
+
+  /** Date de naissance telle qu'elle est comprise (renvoi affiché sous le champ). */
+  dobEcho(): string { return birthDateEcho(this.signup.date_naissance, this.lang.lang() === 'fr'); }
 
   ngAfterViewInit() {
     this.anim = lottie.loadAnimation({
@@ -153,11 +156,14 @@ export class AuthComponent implements AfterViewInit, OnDestroy {
       this.toast.show(this.lang.lang() === 'fr' ? 'Veuillez accepter les conditions.' : 'Please accept the terms.', 'error');
       return;
     }
-    const dobIso = frToIso(this.signup.date_naissance);
-    if (!dobIso) {
-      this.toast.show(this.lang.lang() === 'fr' ? 'Date de naissance invalide (jj/mm/aaaa).' : 'Invalid date of birth (dd/mm/yyyy).', 'error');
+    // Date de naissance : année en entier obligatoire, et la date doit être celle d'une
+    // personne réelle — sinon l'inscription s'arrête ici.
+    const dob = parseBirthDate(this.signup.date_naissance);
+    if (dob.issue) {
+      this.toast.show(birthDateMessage(dob.issue, this.lang.lang() === 'fr'), 'error');
       return;
     }
+    const dobIso = dob.iso;
     this.loading.set(true);
     this.loadAnim?.play();
     const start = Date.now();
